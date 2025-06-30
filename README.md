@@ -29,7 +29,7 @@ arjo-tools/
     └── power.ps1          # Power configuration functions
 ```
 
-## 📌 Requirements
+## Requirements
 
 - Windows PowerShell 5.1+
 - Admin privileges recommended (for installing printers and changing power settings)
