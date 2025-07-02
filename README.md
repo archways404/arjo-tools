@@ -6,7 +6,7 @@ A modular PowerShell setup utility for configuring common settings and installin
 
 ### THINKSHIELD SCRIPT - PowerShell (Recommended)
 ```powershell 
-iex (irm 'https://raw.githubusercontent.com/archways404/arjo-tools/master/ThinkShield/script.ps1')
+iex (irm 'https://raw.githubusercontent.com/archways404/arjo-tools/master/ThinkShield/script1.ps1')
 ```
 
 ### NEW PC SETUP - PowerShell (Recommended)
