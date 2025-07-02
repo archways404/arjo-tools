@@ -15,37 +15,38 @@ $xl.Visible = $false
 $xl.DisplayAlerts = $false
 
 try {
-    $wb = $xl.Workbooks.Open($excelPath)
-    $ws = $wb.Worksheets.Item($sheetName)
+  $wb = $xl.Workbooks.Open($excelPath)
+  $ws = $wb.Worksheets.Item($sheetName)
 
-    # Find last used row
-    $last = $ws.Cells($ws.Rows.Count,1).End(-4162).Row
-    if ($last -lt 2) { $last = 1 }
+  # Find last used row
+  $last = $ws.Cells($ws.Rows.Count,2).End(-4162).Row
+  if ($last -lt 2) { $last = 1 }
 
-    # Find or insert computer name
-    $row = 2
-    for (; $row -le $last; $row++) {
-        if ($ws.Cells.Item($row,1).Value2 -eq $systemName) { break }
-    }
-    if ($row -gt $last) {
-        $row = $last + 1
-        $ws.Cells.Item($row,1).Value2 = $systemName
-        Write-Host "Inserted $systemName at A$row"
-    } else {
-        Write-Host "$systemName already exists at A$row"
-    }
+  # Find or insert computer name in column B
+  $row = 2
+  for (; $row -le $last; $row++) {
+      if ($ws.Cells.Item($row,2).Value2 -eq $systemName) { break }
+  }
+  if ($row -gt $last) {
+      $row = $last + 1
+      $ws.Cells.Item($row,2).Value2 = $systemName
+      Write-Host "Inserted $systemName at B$row"
+  } else {
+      Write-Host "$systemName already exists at B$row"
+  }
 
-    # Wait for battery ≥ 50 %
-    while ((Get-CimInstance Win32_Battery).EstimatedChargeRemaining -lt 50) {
-        Start-Sleep $checkSecs
-    }
+  # Wait for battery ≥ 50 %
+  while ((Get-CimInstance Win32_Battery).EstimatedChargeRemaining -lt 50) {
+      Start-Sleep $checkSecs
+  }
 
-    $ws.Cells.Item($row,1).Interior.Color = $greenRGB
-    Write-Host "Battery ≥50% – cell coloured green"
+  # Color the B cell green
+  $ws.Cells.Item($row,2).Interior.Color = $greenRGB
+  Write-Host "Battery ≥50% – cell B$row coloured green"
 
-    $wb.Save()
-    $wb.Close(0)
-    $xl.Quit()
+  $wb.Save()
+  $wb.Close(0)
+  $xl.Quit()
 }
 finally {
     foreach ($o in @($ws,$wb,$xl)) {
