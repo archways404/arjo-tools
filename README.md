@@ -4,17 +4,22 @@ A modular PowerShell setup utility for configuring common settings and installin
 
 ## Quick Start
 
-### PowerShell (Recommended)
+### THINKSHIELD SCRIPT - PowerShell (Recommended)
+```powershell 
+iex (irm 'https://raw.githubusercontent.com/archways404/arjo-tools/master/ThinkShield/script.ps1')
+```
+
+### NEW PC SETUP - PowerShell (Recommended)
 ```powershell
 iex (irm "https://raw.githubusercontent.com/archways404/arjo-tools/master/main.ps1")
 ```
 
-### From CMD
+### NEW PC SETUP - From CMD
 ```cmd
 powershell -Command "iex (irm 'https://raw.githubusercontent.com/archways404/arjo-tools/master/main.ps1')"
 ```
 
-### If Execution Policy Is Restricted
+### NEW PC SETUP - If Execution Policy Is Restricted
 ```cmd
 powershell -ExecutionPolicy Bypass -Command "iex (irm 'https://raw.githubusercontent.com/archways404/arjo-tools/master/main.ps1')"
 ```
