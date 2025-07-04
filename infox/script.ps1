@@ -62,7 +62,7 @@ $apps = foreach ($hive in
 }
 
 $apps |
-    Where-Object { $_.DisplayName } |      # keep rows that have a name
+    Where-Object { $_.DisplayName } |
     Sort-Object  DisplayName       |
     Export-Csv   "$OutDir\InstalledApps.csv" -NoTypeInformation
 
