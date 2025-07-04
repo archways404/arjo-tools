@@ -51,13 +51,20 @@ try {
 # 3a) Systeminfo
 systeminfo /FO LIST > "$OutDir\SystemInfo.txt"
 
-# 3b) Installed applications
-foreach ($hive in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
-                      'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall') {
-    Get-ChildItem $hive | Get-ItemProperty |
-        Select DisplayName, DisplayVersion, Publisher, InstallDate
-} | Where DisplayName | Sort DisplayName |
-  Export-Csv "$OutDir\InstalledApps.csv" -NoTypeInformation
+############ 3b) Installed applications ############
+$apps = foreach ($hive in
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')
+{
+    Get-ChildItem $hive |
+        Get-ItemProperty |
+        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
+}
+
+$apps |
+    Where-Object { $_.DisplayName } |      # keep rows that have a name
+    Sort-Object  DisplayName       |
+    Export-Csv   "$OutDir\InstalledApps.csv" -NoTypeInformation
 
 # 3c) Network
 ipconfig /all > "$OutDir\Network.txt"
