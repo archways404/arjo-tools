@@ -2,13 +2,13 @@
 
 # Arjo Tools
 
-![GitHub Release](https://img.shields.io/github/v/release/archways404/arjo-tools?sort=semver&display_name=release&style=flat&logo=iterm2&label=&color=3DDB00)
- 
 **Modular PowerShell setup utility for configuring ARJO machines.**
  
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue?logo=powershell&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white)
 ![Admin](https://img.shields.io/badge/Admin-Recommended-orange)
+
+![GitHub Release](https://img.shields.io/github/v/release/archways404/arjo-tools?sort=semver&display_name=release&style=flat&logo=iterm2&label=&color=3DDB00)
 
  
 </div>
