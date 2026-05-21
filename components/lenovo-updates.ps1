@@ -22,9 +22,7 @@ function Start-LenovoUpdates {
     # ------------------------------------------------------------------
     # Admin check — relaunch elevated if needed
     # ------------------------------------------------------------------
-    $isAdmin = ([Security.Principal.WindowsPrincipal]
-                [Security.Principal.WindowsIdentity]::GetCurrent()
-               ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
     if (-not $isAdmin) {
         Log -Level WARN -Message "Not running as Administrator. Relaunching elevated..."
