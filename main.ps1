@@ -62,6 +62,12 @@ $menuItems = @(
         Description = "Scans and installs Lenovo driver and firmware updates (runs as admin)"
         Url         = "$repo/components/lenovo-updates.ps1"
         EntryPoint  = "Start-LenovoUpdates"
+    },
+    @{
+        Label       = "View Lenovo Update Logs (IN BETA)"
+        Description = "Lists and displays logs from previous update runs"
+        Url         = "$repo/components/view-logs.ps1"
+        EntryPoint  = "Show-LenovoLogs"
     }
 )
 
