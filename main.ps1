@@ -58,7 +58,7 @@ $menuItems = @(
         EntryPoint  = ""   # This script runs immediately on load, no separate entry point needed
     },
     @{
-        Label       = "Lenovo System Updates"
+        Label       = "Lenovo System Updates (IN BETA)"
         Description = "Scans and installs Lenovo driver and firmware updates (runs as admin)"
         Url         = "$repo/components/lenovo-updates.ps1"
         EntryPoint  = "Start-LenovoUpdates"
