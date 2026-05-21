@@ -56,6 +56,12 @@ $menuItems = @(
         Description = "Re-enables the Teams Meeting add-in when inactive or crash-disabled"
         Url         = "$repo/outlook-classic/ms_outlook16classic_teams_addin.ps1"
         EntryPoint  = ""   # This script runs immediately on load, no separate entry point needed
+    },
+    @{
+        Label       = "Lenovo System Updates"
+        Description = "Scans and installs Lenovo driver and firmware updates (runs as admin)"
+        Url         = "$repo/components/lenovo-updates.ps1"
+        EntryPoint  = "Start-LenovoUpdates"
     }
 )
 
