@@ -85,6 +85,7 @@ function Start-LenovoUpdates {
        # Cleanup — remove LSUClient after use
        # ------------------------------------------------------------------
        Log -Level INFO -Message "Removing LSUClient..."
+       Remove-Module -Name LSUClient -Force -ErrorAction SilentlyContinue
        Uninstall-Module -Name LSUClient -AllVersions -Force
        Log -Level SUCCESS -Message "LSUClient removed."
 
