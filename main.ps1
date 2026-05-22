@@ -68,6 +68,12 @@ $menuItems = @(
         Description = "Lists and displays logs from previous update runs"
         Url         = "$repo/components/view-logs.ps1"
         EntryPoint  = "Show-LenovoLogs"
+    },
+    @{
+        Label       = "View local admins (IN BETA)"
+        Description = "Lists and displays local admins for a domain"
+        Url         = "$repo/components/list-local-admin-for-site.ps1"
+        EntryPoint  = "Show-GroupMenu"
     }
 )
 

@@ -18,10 +18,15 @@
 ## Quick Start
  
 Open **PowerShell** and run:
- 
+
 ```powershell
-iex (irm "https://raw.githubusercontent.com/archways404/arjo-tools/master/main.ps1")
+iex (irm "https://arjo.k14net.org")
 ```
+
+> **Backup** (direct link):
+> ```powershell
+> iex (irm "https://raw.githubusercontent.com/archways404/arjo-tools/master/main.ps1")
+> ```
  
 An interactive menu will appear — pick what you need, then press `0` to exit when done.
  
@@ -34,10 +39,19 @@ An interactive menu will appear — pick what you need, then press `0` to exit w
 | `1` | **Add Printers** | Installs and configures standard network printers |
 | `2` | **Set Power Settings** | Applies the standard ARJO power profile |
 | `3` | **Fix Teams Add-in** *(Outlook Classic)* | Re-enables the Teams Meeting add-in when inactive or crash-disabled |
- 
+| `4` | **Lenovo System Updates** *(IN BETA)* | Scans and installs Lenovo driver and firmware updates — relaunches elevated if needed |
+| `5` | **View Lenovo Update Logs** *(IN BETA)* | Lists and displays logs from previous Lenovo update runs |
+| `6` | **View Local Admins** *(IN BETA)* | Lists users with local administrator rights on domain machines |
+
 > After each task completes you are returned to the menu automatically.
- 
+
 ---
+
+## Notes
+
+- Options marked **IN BETA** are still being tested and may not work in all environments.
+- **Lenovo System Updates** requires the machine to be a Lenovo device. It will automatically relaunch as Administrator if not already elevated.
+- **View Local Admins** scans machines in the SEMA3 OU. Offline machines are skipped automatically. Coverage depends on how many machines are online at the time of the scan.
  
 ## ✅ Requirements
  
