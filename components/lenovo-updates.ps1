@@ -82,6 +82,18 @@ function Start-LenovoUpdates {
     }
 
     # ------------------------------------------------------------------
-    Stop-Transcript
-    Log -Level SUCCESS -Message "Done. Log saved to: $logPath"
+       # Cleanup — remove LSUClient after use
+       # ------------------------------------------------------------------
+       Log -Level INFO -Message "Removing LSUClient..."
+       Uninstall-Module -Name LSUClient -AllVersions -Force
+       Log -Level SUCCESS -Message "LSUClient removed."
+
+       # ------------------------------------------------------------------
+       Stop-Transcript
+       Log -Level SUCCESS -Message "Done. Log saved to: $logPath"
+}
+
+# Entry point
+if ($MyInvocation.InvocationName -ne '.') {
+    Start-LenovoUpdates
 }
