@@ -79,7 +79,7 @@ $menuItems = @(
         Label       = "Nils & Kobby Net-User script"
         Description = "Look up AD user details and group memberships"
         Url         = "$repo/components/nk-net-user-lookup.ps1"
-        EntryPoint  = "Show-GroupMenu"
+        EntryPoint  = "Start-UserLookup"
     }
 )
 
