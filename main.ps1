@@ -92,6 +92,7 @@ function Invoke-RemoteScript {
 
     try {
         $content = (Invoke-WebRequest $Url -UseBasicParsing -ErrorAction Stop).Content
+        $content = $content -replace '^\xEF\xBB\xBF', ''   # <-- add this line here
     } catch {
         Log -Level ERROR -Message "Failed to download script: $_"
         return
