@@ -75,6 +75,12 @@ $menuItems = @(
         Url         = "$repo/components/list-local-admin-for-site.ps1"
         EntryPoint  = "Show-GroupMenu"
     }
+    @{
+        Label       = "Nils & Kobby Net-User script"
+        Description = "Look up AD user details and group memberships"
+        Url         = "$repo/components/nk-net-user-lookup.ps1"
+        EntryPoint  = "Show-GroupMenu"
+    }
 )
 
 # ------------------------------------------------------------------------------

@@ -42,6 +42,7 @@ An interactive menu will appear — pick what you need, then press `0` to exit w
 | `4` | **Lenovo System Updates** *(IN BETA)* | Scans and installs Lenovo driver and firmware updates — relaunches elevated if needed |
 | `5` | **View Lenovo Update Logs** *(IN BETA)* | Lists and displays logs from previous Lenovo update runs |
 | `6` | **View Local Admins** *(IN BETA)* | Lists users with local administrator rights on domain machines |
+| `7` | **Nils & Kobby Net-User script** | Look up AD user details and group memberships by username or display name |
 
 > After each task completes you are returned to the menu automatically.
 
