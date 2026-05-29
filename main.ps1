@@ -104,11 +104,14 @@ function Invoke-RemoteScript {
 
     try {
         $content = (Invoke-WebRequest $Url -UseBasicParsing -ErrorAction Stop).Content
-        # Strip BOM if present (UTF-8 BOM is 3 bytes: EF BB BF)
-        if ($content.StartsWith([char]0xEF)) {
-            $content = $content.Substring(3)
-        } elseif ($content.StartsWith([char]0xFEFF)) {
+
+        # Strip BOM — UTF-8 BOM is EF BB BF which becomes the unicode char FEFF
+        if ($content.Length -gt 0 -and [int][char]$content[0] -eq 0xFEFF) {
             $content = $content.Substring(1)
+        }
+        # Also handle if it starts with literal "ï»¿" (mojibake BOM)
+        if ($content.StartsWith("ï»¿")) {
+            $content = $content.Substring(3)
         }
     } catch {
         Log -Level ERROR -Message "Failed to download script: $_"
