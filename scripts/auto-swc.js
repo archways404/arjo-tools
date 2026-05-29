@@ -378,30 +378,36 @@ async function exportGridToJson(page) {
 
 async function run(page) {
   await navigateTo(page, process.env.SWC_URL);
+
+  // SELECT ROLE
   await clickRole(page, "NLTIE");
+
+  // OPEN MANAGE SOFTWARE FLOW
   await openManageSoftware(page);
   await searchPC(page, "PC025293");
-
-  // Single
+  // Add single software
   //await addSoftware(page, "AdobeAcrobatDC_21_SSP_EN_01_(x64)");
 
-  // Or a list
+  // Add a list of software
   await addSoftware(page, [
     "AdobeAcrobatDC_21_SSP_EN_01_(x64)",
     "AdobeCreativeCloudDesktop_SSP_EN_02_(x64)",
   ]);
-
+  // EXECUTE INSTALLATION (disabled for testing)
   //await installSoftware(page);
 
+  // OPEN EDIT COMPUTER
   //await openEditComputer(page);
   //await searchPCEditComputer(page, "PC025293");
   //await selectTemplate(page, "NLTIE (NL)");
+  // APPLY CHANGES (disabled for testing)
   //await applyChanges(page);
 
+  // OPEN SOFTWARE STATUS
   await openSoftwareStatus(page);
   await searchAndSelectPCGrid(page, "PC025293");
-
   const data = await exportGridToJson(page);
+  // print data to console (debug)
   console.log("DATA: ", data);
 }
 
