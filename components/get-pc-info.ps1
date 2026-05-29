@@ -19,3 +19,5 @@ function Get-PCInfo {
         OSBuild      = $os.BuildNumber
     } | Format-List
 }
+
+Get-PCInfo
