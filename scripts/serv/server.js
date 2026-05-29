@@ -1,0 +1,61 @@
+import Fastify from "fastify";
+import ExcelJS from "exceljs";
+import "dotenv/config";
+
+const app = Fastify({ logger: true });
+
+const EXCEL_PATH = process.env.EXCEL_PATH;
+const SHEET_NAME = process.env.SHEET_NAME ?? "Computers";
+const START_ROW = parseInt(process.env.START_ROW ?? "2", 10);
+
+const COLUMN_MAP = {
+  D: "PCName",
+  AD: "Manufacturer",
+  AF: "Model",
+  AG: "ProductCode",
+  X: "Serial",
+  Y: "MACAddresses",
+  //: "OSCaption",
+  P: "OSRelease",
+  //: "OSBuild",
+};
+
+app.post("/pc-info", async (request, reply) => {
+  try {
+    const data = request.body;
+    console.log("[RECEIVED]", data.PCName);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(EXCEL_PATH);
+
+    const ws = workbook.getWorksheet(SHEET_NAME);
+    // Find the next empty row starting from START_ROW
+    let nextRow = START_ROW;
+    while (ws.getRow(nextRow).getCell(1).value !== null) {
+      nextRow++;
+    }
+    const row = ws.getRow(nextRow);
+
+    for (const [col, field] of Object.entries(COLUMN_MAP)) {
+      const colIndex = col.charCodeAt(0) - 64;
+      row.getCell(colIndex).value = data[field] ?? "";
+    }
+
+    row.commit();
+    await workbook.xlsx.writeFile(EXCEL_PATH);
+
+    console.log(`[SAVED] Row ${nextRow} written`);
+    return { ok: true, row: nextRow };
+  } catch (err) {
+    console.error("[ERROR]", err.message);
+    reply.status(500);
+    return { ok: false, error: err.message };
+  }
+});
+
+try {
+  await app.listen({ port: 3000, host: "0.0.0.0" });
+} catch (err) {
+  app.log.error(err);
+  process.exit(1);
+}

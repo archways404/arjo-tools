@@ -6,3 +6,8 @@ hotkeys/laps/.env
 /scripts/node_modules
 scripts/package-lock.json
 scripts/.env
+/scripts/serv/node_modules
+scripts/serv/.env
+scripts/serv/package-lock.json
+scripts/auto-swc/.env
+scripts/auto-swc/package-lock.json
