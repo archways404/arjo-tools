@@ -52,7 +52,7 @@ $menuItems = @(
         EntryPoint  = "Set-PowerSettings"
     },
     @{
-        Label       = "Fix Teams Add-in (Outlook Classic)"
+        Label       = "Fix Teams Add-in (Outlook Classic) - Disabled"
         Description = "Re-enables the Teams Meeting add-in when inactive or crash-disabled"
         Url         = "$repo/outlook-classic/ms_outlook16classic_teams_addin.ps1"
         EntryPoint  = ""   # This script runs immediately on load, no separate entry point needed
@@ -80,6 +80,12 @@ $menuItems = @(
         Description = "Look up AD user details and group memberships"
         Url         = "$repo/components/nk-net-user-lookup.ps1"
         EntryPoint  = "Start-UserLookup"
+    },
+    @{
+        Label       = "Get PC Info"
+        Description = "Displays local PC hardware and OS details"
+        Url         = "$repo/components/get-pc-info.ps1"
+        EntryPoint  = "Get-PCInfo"
     }
 )
 

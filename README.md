@@ -38,11 +38,12 @@ An interactive menu will appear — pick what you need, then press `0` to exit w
 |:-:|--------|-------------|
 | `1` | **Add Printers** | Installs and configures standard network printers |
 | `2` | **Set Power Settings** | Applies the standard ARJO power profile |
-| `3` | **Fix Teams Add-in** *(Outlook Classic)* | Re-enables the Teams Meeting add-in when inactive or crash-disabled |
+| `3` | **Fix Teams Add-in** *(Outlook Classic)*  *DISABLED* | Re-enables the Teams Meeting add-in when inactive or crash-disabled |
 | `4` | **Lenovo System Updates** *(IN BETA)* | Scans and installs Lenovo driver and firmware updates — relaunches elevated if needed |
 | `5` | **View Lenovo Update Logs** *(IN BETA)* | Lists and displays logs from previous Lenovo update runs |
 | `6` | **View Local Admins** *(IN BETA)* | Lists users with local administrator rights on domain machines |
 | `7` | **Nils & Kobby Net-User script** | Look up AD user details and group memberships by username or display name |
+| `8` | **Get PC Info** | Displays local PC hardware and OS details (name, model, serial, MAC, OS) |
 
 > After each task completes you are returned to the menu automatically.
 
@@ -114,13 +115,14 @@ iex (irm "https://raw.githubusercontent.com/archways404/arjo-tools/master/ThinkS
 ```
 arjo-tools/
 ├── main.ps1                                    # Interactive menu entrypoint
-├── components/
-│   ├── printers.ps1                            # Printer installation (exposes Add-Printers)
-│   └── power.ps1                               # Power configuration (exposes Set-PowerSettings)
-├── outlook-classic/
-│   └── ms_outlook16classic_teams_addin.ps1     # Teams add-in fix for Outlook 16 Classic
-└── ThinkShield/
-    └── script1.ps1                             # ThinkShield configuration
+└── components/
+   ├── printers.ps1                            # Printer installation (exposes Add-Printers)
+   ├── power.ps1                               # Power configuration (exposes Set-PowerSettings)
+   ├── get-pc-info.ps1                         # PC hardware/OS info (exposes Get-PCInfo)
+   ├── lenovo-updates.ps1                      # Lenovo driver/firmware updates (exposes Start-LenovoUpdates)
+   ├── view-logs.ps1                           # Lenovo update log viewer (exposes Show-LenovoLogs)
+   ├── list-local-admin-for-site.ps1           # Local admin listing (exposes Show-GroupMenu)
+   └── nk-net-user-lookup.ps1                  # AD user lookup (exposes Start-UserLookup)    # Teams add-in fix for Outlook 16 Classic
 ```
  
 Scripts under `components/` expose named functions and are loaded by `main.ps1` on demand.
