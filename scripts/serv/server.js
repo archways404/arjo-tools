@@ -27,6 +27,24 @@ const COLUMN_MAP = {
   //: "OSBuild",
 };
 
+// Static values — always written regardless of input
+const STATIC_MAP = {
+  AC: "No",
+  AB: "Laptop",
+  AH: "2026",
+  AI: "01-06-2026",
+  AJ: "EGISS",
+  AK: "Win11",
+};
+
+function colLetterToIndex(col) {
+  let index = 0;
+  for (let i = 0; i < col.length; i++) {
+    index = index * 26 + col.charCodeAt(i) - 64;
+  }
+  return index;
+}
+
 app.post("/pc-info", async (request, reply) => {
   try {
     const data = request.body;
@@ -44,8 +62,13 @@ app.post("/pc-info", async (request, reply) => {
     const row = ws.getRow(nextRow);
 
     for (const [col, field] of Object.entries(COLUMN_MAP)) {
-      const colIndex = col.charCodeAt(0) - 64;
+      const colIndex = colLetterToIndex(col);
       row.getCell(colIndex).value = data[field] ?? "";
+    }
+
+    for (const [col, value] of Object.entries(STATIC_MAP)) {
+      const colIndex = colLetterToIndex(col);
+      row.getCell(colIndex).value = value;
     }
 
     row.commit();
