@@ -104,7 +104,10 @@ function Invoke-RemoteScript {
 
     try {
         $content = (Invoke-WebRequest $Url -UseBasicParsing -ErrorAction Stop).Content
-        if ($content.StartsWith([char]0xFEFF)) {
+        # Strip BOM if present (UTF-8 BOM is 3 bytes: EF BB BF)
+        if ($content.StartsWith([char]0xEF)) {
+            $content = $content.Substring(3)
+        } elseif ($content.StartsWith([char]0xFEFF)) {
             $content = $content.Substring(1)
         }
     } catch {

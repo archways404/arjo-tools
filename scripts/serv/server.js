@@ -1,12 +1,19 @@
 import Fastify from "fastify";
 import ExcelJS from "exceljs";
-import "dotenv/config";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, ".env") });
 
 const app = Fastify({ logger: true });
 
 const EXCEL_PATH = process.env.EXCEL_PATH;
 const SHEET_NAME = process.env.SHEET_NAME ?? "Computers";
 const START_ROW = parseInt(process.env.START_ROW ?? "2", 10);
+
+console.log(EXCEL_PATH);
 
 const COLUMN_MAP = {
   D: "PCName",
