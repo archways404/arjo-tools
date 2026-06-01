@@ -11,3 +11,4 @@ scripts/serv/.env
 scripts/serv/package-lock.json
 scripts/auto-swc/.env
 scripts/auto-swc/package-lock.json
+scripts/nh-email/new_hires.csv

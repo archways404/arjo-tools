@@ -44,6 +44,7 @@ An interactive menu will appear — pick what you need, then press `0` to exit w
 | `6` | **View Local Admins** *(IN BETA)* | Lists users with local administrator rights on domain machines |
 | `7` | **Nils & Kobby Net-User script** | Look up AD user details and group memberships by username or display name |
 | `8` | **Get PC Info** | Displays local PC hardware and OS details (name, model, serial, MAC, OS) |
+| `9` | **Get User License** | Looks up a user's M365 license and recommends MEC or LTSC Office install |
 
 > After each task completes you are returned to the menu automatically.
 
@@ -114,7 +115,7 @@ iex (irm "https://raw.githubusercontent.com/archways404/arjo-tools/master/ThinkS
  
 ```
 arjo-tools/
-├── main.ps1                                    # Interactive menu entrypoint
+├── main.ps1                                   # Interactive menu entrypoint
 └── components/
    ├── printers.ps1                            # Printer installation (exposes Add-Printers)
    ├── power.ps1                               # Power configuration (exposes Set-PowerSettings)
@@ -122,7 +123,8 @@ arjo-tools/
    ├── lenovo-updates.ps1                      # Lenovo driver/firmware updates (exposes Start-LenovoUpdates)
    ├── view-logs.ps1                           # Lenovo update log viewer (exposes Show-LenovoLogs)
    ├── list-local-admin-for-site.ps1           # Local admin listing (exposes Show-GroupMenu)
-   └── nk-net-user-lookup.ps1                  # AD user lookup (exposes Start-UserLookup)    # Teams add-in fix for Outlook 16 Classic
+   ├── nk-net-user-lookup.ps1                  # AD user lookup (exposes Start-UserLookup)
+   └── mslic.ps1                               # M365 license lookup + Office recommendation (exposes Get-UserLicense) 
 ```
  
 Scripts under `components/` expose named functions and are loaded by `main.ps1` on demand.

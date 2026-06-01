@@ -86,6 +86,12 @@ $menuItems = @(
         Description = "Displays local PC hardware and OS details"
         Url         = "$repo/components/get-pc-info.ps1"
         EntryPoint  = "Get-PCInfo"
+    },
+    @{
+            Label       = "Get User License"
+            Description = "Looks up M365 license and recommends Office install type"
+            Url         = "$repo/components/mslic.ps1"
+            EntryPoint  = "Get-UserLicense"
     }
 )
 
