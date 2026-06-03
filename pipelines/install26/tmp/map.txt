@@ -1,0 +1,56 @@
+DEFAULTS:
+    LogMeIn Client
+    Microsoft Teams
+
+SERVICE_TECH:
+    TempLogger
+
+GRP0:
+    O365
+    Visio
+    Power BI Desktop
+    Logitech G Hub
+    Adobe Acrobat
+    3CX
+    VinceXL
+
+GRP1:
+    O365
+    Visio
+    Power BI Desktop
+    Logitech G Hub
+    Adobe Acrobat
+    3CX
+
+GRP2:
+    O365
+    Visio
+    Logitech G Hub
+    Adobe Acrobat
+    3CX
+
+GRP3:
+    2024LTSC
+    Logitech G Hub
+    Adobe Acrobat
+    3CX
+
+GRP4:
+    O365
+    3CX
+
+GRP5:
+    2024LTSC
+    SPPC3
+    PL23
+    3CX
+
+GRP6:
+    O365
+    Visio
+    3CX
+
+LOCAL:
+    PL23
+    Logitech G Hub
+    3CX
