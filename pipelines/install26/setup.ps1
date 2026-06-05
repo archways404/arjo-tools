@@ -140,17 +140,20 @@ foreach ($step in $steps) {
         -CompletedSteps ($current - 1) `
         -TotalSteps $total
 
-    try {
-        Invoke-PipelineScript -Url $step.Url -EntryPoint $step.EntryPoint
-
-        Send-PipelineStatus `
-            -Stage $step.Stage `
-            -Status "completed" `
-            -Message "Completed $($step.Label)" `
-            -CurrentStep $step.Label `
-            -CompletedSteps $current `
-            -TotalSteps $total
-    } catch {
+        try {
+            Invoke-PipelineScript -Url $step.Url -EntryPoint $step.EntryPoint
+            if ($step.Stage -ne "lenovo") {
+                Send-PipelineStatus `
+                    -Stage $step.Stage `
+                    -Status "completed" `
+                    -Message "Completed $($step.Label)" `
+                    -CurrentStep $step.Label `
+                    -CompletedSteps $current `
+                    -TotalSteps $total
+            } else {
+                Log -Level INFO -Message "Lenovo status is handled by drivers.ps1. Skipping pipeline completion overwrite."
+            }
+        } catch {
         Send-PipelineStatus `
             -Stage $step.Stage `
             -Status "failed" `
