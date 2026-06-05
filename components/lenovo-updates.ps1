@@ -1,17 +1,67 @@
 # ==============================================================================
-# Lenovo System Updates — LSUClient auto-resume after reboot
+# Lenovo System Updates — LSUClient auto-resume after reboot + install status API
 # ==============================================================================
 
 param(
     [switch]$Resume
 )
 
-$ScriptUrl       = "https://raw.githubusercontent.com/archways404/arjo-tools/master/components/lenovo-updates.ps1"
-$BaseDir         = "C:\ProgramData\ArjoTools"
-$LocalScriptPath = Join-Path $BaseDir "lenovo-updates.ps1"
-$LogDir          = Join-Path $BaseDir "Logs"
-$TaskName        = "Arjo Lenovo Updates Resume"
-$CompletedFile   = Join-Path $BaseDir "LenovoUpdatesCompleted.txt"
+$ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/components/lenovo-updates.ps1"
+$StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
+
+$BaseDir          = "C:\ProgramData\ArjoTools"
+$LocalScriptPath  = Join-Path $BaseDir "lenovo-updates.ps1"
+$LogDir           = Join-Path $BaseDir "Logs"
+$TaskName         = "Arjo Lenovo Updates Resume"
+$CompletedFile    = Join-Path $BaseDir "LenovoUpdatesCompleted.txt"
+
+function Get-SerialNumber {
+    try {
+        return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber
+    } catch {
+        return $null
+    }
+}
+
+function Send-InstallStatus {
+    param(
+        [string]$Stage,
+        [string]$Status,
+        [string]$Message,
+        [string]$CurrentStep = $null,
+        [int]$CompletedSteps = 0,
+        [int]$TotalSteps = 0,
+        [hashtable]$Extra = @{}
+    )
+
+    try {
+        $body = @{
+            PCName         = $env:COMPUTERNAME
+            Serial         = Get-SerialNumber
+            Stage          = $Stage
+            Status         = $Status
+            Message        = $Message
+            CurrentStep    = $CurrentStep
+            CompletedSteps = $CompletedSteps
+            TotalSteps     = $TotalSteps
+            Resume         = [bool]$Resume
+            UserContext    = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+            LogFile        = $script:LogFile
+            Timestamp      = (Get-Date).ToString("o")
+            Extra          = $Extra
+        } | ConvertTo-Json -Depth 10
+
+        Invoke-RestMethod `
+            -Uri $StatusApiUrl `
+            -Method POST `
+            -Body $body `
+            -ContentType "application/json" `
+            -TimeoutSec 10 `
+            -ErrorAction Stop | Out-Null
+    } catch {
+        Log -Level WARN -Message "Failed sending install status: $($_.Exception.Message)"
+    }
+}
 
 function Log {
     param(
@@ -82,12 +132,16 @@ function Ensure-LocalScript {
     Ensure-Folders
 
     Log -Level INFO -Message "Downloading latest script to: $LocalScriptPath"
+    Send-InstallStatus -Stage "bootstrap" -Status "running" -Message "Downloading latest Lenovo update script" -CurrentStep "Ensure-LocalScript"
+
     Invoke-WebRequest -Uri $ScriptUrl -OutFile $LocalScriptPath -UseBasicParsing -ErrorAction Stop
+
     Log -Level SUCCESS -Message "Local script updated."
 }
 
 function Register-ResumeTask {
     Log -Level INFO -Message "Registering startup resume task: $TaskName"
+    Send-InstallStatus -Stage "scheduled-task" -Status "running" -Message "Registering resume task" -CurrentStep "Register-ResumeTask"
 
     $action = New-ScheduledTaskAction `
         -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
@@ -123,13 +177,12 @@ function Remove-ResumeTask {
         Log -Level INFO -Message "Removing scheduled task: $TaskName"
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
         Log -Level SUCCESS -Message "Scheduled task removed."
-    } else {
-        Log -Level INFO -Message "No scheduled task found to remove."
     }
 }
 
 function Ensure-LSUClient {
     Log -Level INFO -Message "Preparing PowerShell Gallery / NuGet / LSUClient..."
+    Send-InstallStatus -Stage "lsuclient" -Status "running" -Message "Preparing LSUClient module" -CurrentStep "Ensure-LSUClient"
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -150,7 +203,9 @@ function Ensure-LSUClient {
         Set-PSRepository -Name PSGallery -InstallationPolicy $oldPolicy -ErrorAction SilentlyContinue
         Log -Level SUCCESS -Message "LSUClient ready."
     } catch {
-        Log -Level ERROR -Message "Failed to install LSUClient: $($_.Exception.Message)"
+        Send-InstallStatus -Stage "lsuclient" -Status "failed" -Message "Failed to install LSUClient" -CurrentStep "Ensure-LSUClient" -Extra @{
+            Error = $_.Exception.Message
+        }
         throw
     }
 }
@@ -168,6 +223,12 @@ LogFile: $script:LogFile
     Set-Content -LiteralPath $CompletedFile -Value $content -Force
 
     Remove-ResumeTask
+
+    Send-InstallStatus `
+        -Stage "lenovo-updates" `
+        -Status "completed" `
+        -Message "No Lenovo updates remaining. Finished completely." `
+        -CurrentStep "Complete-Run"
 
     Log -Level SUCCESS -Message "Completion marker written to: $CompletedFile"
     Log -Level SUCCESS -Message "Finished completely."
@@ -189,109 +250,174 @@ function Start-LenovoUpdates {
     Log -Level INFO -Message "Computer: $env:COMPUTERNAME"
     Log -Level INFO -Message "User context: $([Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 
-    if (-not (Test-IsAdmin)) {
-        Log -Level WARN -Message "Not running elevated. Relaunching as admin..."
+    Send-InstallStatus -Stage "startup" -Status "running" -Message "Lenovo update script started" -CurrentStep "Start-LenovoUpdates"
 
-        Ensure-LocalScript
+    try {
+        if (-not (Test-IsAdmin)) {
+            Log -Level WARN -Message "Not running elevated. Relaunching as admin..."
 
-        Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
-            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`"" `
-            -Verb RunAs
+            Send-InstallStatus -Stage "elevation" -Status "running" -Message "Relaunching script as administrator" -CurrentStep "Elevation"
 
-        Log -Level INFO -Message "Elevated window launched. Closing this unelevated run."
-        Stop-Logging
-        return
-    }
+            Ensure-LocalScript
 
-    Remove-Item -LiteralPath $CompletedFile -Force -ErrorAction SilentlyContinue
+            Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+                -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`"" `
+                -Verb RunAs
 
-    Ensure-LocalScript
-    Register-ResumeTask
-    Ensure-LSUClient
-
-    $MaxRounds = 5
-
-    for ($Round = 1; $Round -le $MaxRounds; $Round++) {
-        Log -Level HEADER -Message "Round $Round of $MaxRounds"
-
-        try {
-            $updates = @(Get-LSUpdate -Verbose)
-        } catch {
-            Log -Level ERROR -Message "Get-LSUpdate failed: $($_.Exception.Message)"
             Stop-Logging
-            throw
+            return
         }
 
-        Log -Level INFO -Message "$($updates.Count) update(s) found."
+        Remove-Item -LiteralPath $CompletedFile -Force -ErrorAction SilentlyContinue
 
-        if ($updates.Count -eq 0) {
+        Ensure-LocalScript
+        Register-ResumeTask
+        Ensure-LSUClient
+
+        $MaxRounds = 5
+
+        for ($Round = 1; $Round -le $MaxRounds; $Round++) {
+            Log -Level HEADER -Message "Round $Round of $MaxRounds"
+
+            Send-InstallStatus `
+                -Stage "scan" `
+                -Status "running" `
+                -Message "Scanning for Lenovo updates" `
+                -CurrentStep "Get-LSUpdate" `
+                -CompletedSteps ($Round - 1) `
+                -TotalSteps $MaxRounds
+
+            $updates = @(Get-LSUpdate -Verbose)
+
+            Log -Level INFO -Message "$($updates.Count) update(s) found."
+
+            if ($updates.Count -eq 0) {
+                Complete-Run
+                return
+            }
+
+            Send-InstallStatus `
+                -Stage "download" `
+                -Status "running" `
+                -Message "$($updates.Count) Lenovo update(s) found. Downloading packages." `
+                -CurrentStep "Save-LSUpdate" `
+                -CompletedSteps 0 `
+                -TotalSteps $updates.Count `
+                -Extra @{
+                    UpdateCount = $updates.Count
+                    Updates = @($updates | ForEach-Object { $_.Title })
+                }
+
+            $updates | Save-LSUpdate -Verbose
+
+            Log -Level SUCCESS -Message "All updates downloaded."
+
+            $i = 1
+
+            foreach ($update in $updates) {
+                Log -Level HEADER -Message "Installing [$i/$($updates.Count)]"
+                Log -Level INFO -Message "$($update.Title)"
+
+                Send-InstallStatus `
+                    -Stage "install" `
+                    -Status "running" `
+                    -Message "Installing Lenovo update: $($update.Title)" `
+                    -CurrentStep $update.Title `
+                    -CompletedSteps ($i - 1) `
+                    -TotalSteps $updates.Count `
+                    -Extra @{
+                        Round = $Round
+                        UpdateTitle = $update.Title
+                    }
+
+                try {
+                    Install-LSUpdate `
+                        -Package $update `
+                        -Verbose `
+                        -SaveBIOSUpdateInfoToRegistry
+
+                    Send-InstallStatus `
+                        -Stage "install" `
+                        -Status "running" `
+                        -Message "Installed Lenovo update: $($update.Title)" `
+                        -CurrentStep $update.Title `
+                        -CompletedSteps $i `
+                        -TotalSteps $updates.Count
+
+                    Log -Level SUCCESS -Message "Installed: $($update.Title)"
+                } catch {
+                    Log -Level ERROR -Message "Failed installing $($update.Title): $($_.Exception.Message)"
+
+                    Send-InstallStatus `
+                        -Stage "install" `
+                        -Status "failed" `
+                        -Message "Failed installing Lenovo update: $($update.Title)" `
+                        -CurrentStep $update.Title `
+                        -CompletedSteps ($i - 1) `
+                        -TotalSteps $updates.Count `
+                        -Extra @{
+                            Error = $_.Exception.Message
+                            UpdateTitle = $update.Title
+                        }
+                }
+
+                $i++
+            }
+
+            if (Test-PendingReboot) {
+                Log -Level WARN -Message "Pending reboot detected. Rebooting in 30 seconds. Script will resume at startup."
+
+                Send-InstallStatus `
+                    -Stage "reboot" `
+                    -Status "rebooting" `
+                    -Message "Pending reboot detected. Rebooting in 30 seconds." `
+                    -CurrentStep "Restart-Computer"
+
+                Stop-Logging
+                Start-Sleep -Seconds 30
+                Restart-Computer -Force
+                return
+            }
+
+            Log -Level INFO -Message "No pending reboot detected after round $Round."
+        }
+
+        Log -Level WARN -Message "Max rounds reached. Re-checking update state."
+
+        $remaining = @(Get-LSUpdate)
+
+        if ($remaining.Count -eq 0) {
             Complete-Run
             return
         }
 
-        foreach ($u in $updates) {
-            Log -Level INFO -Message "Update found: $($u.Title)"
-        }
-
-        try {
-            Log -Level INFO -Message "Downloading all updates before installing..."
-            $updates | Save-LSUpdate -Verbose
-            Log -Level SUCCESS -Message "All updates downloaded."
-        } catch {
-            Log -Level ERROR -Message "Save-LSUpdate failed: $($_.Exception.Message)"
-            Stop-Logging
-            throw
-        }
-
-        $i = 1
-
-        foreach ($update in $updates) {
-            Log -Level HEADER -Message "Installing [$i/$($updates.Count)]"
-            Log -Level INFO -Message "$($update.Title)"
-
-            try {
-                Install-LSUpdate `
-                    -Package $update `
-                    -Verbose `
-                    -SaveBIOSUpdateInfoToRegistry
-
-                Log -Level SUCCESS -Message "Installed: $($update.Title)"
-            } catch {
-                Log -Level ERROR -Message "Failed installing $($update.Title): $($_.Exception.Message)"
+        Send-InstallStatus `
+            -Stage "lenovo-updates" `
+            -Status "warning" `
+            -Message "$($remaining.Count) update(s) still remain after max rounds. Task will retry after next startup." `
+            -CurrentStep "MaxRoundsReached" `
+            -Extra @{
+                RemainingCount = $remaining.Count
+                RemainingUpdates = @($remaining | ForEach-Object { $_.Title })
             }
 
-            $i++
-        }
-
-        if (Test-PendingReboot) {
-            Log -Level WARN -Message "Pending reboot detected. Rebooting in 30 seconds. Script will resume at startup."
-            Stop-Logging
-            Start-Sleep -Seconds 30
-            Restart-Computer -Force
-            return
-        }
-
-        Log -Level INFO -Message "No pending reboot detected after round $Round."
-    }
-
-    Log -Level WARN -Message "Max rounds reached. Re-checking update state."
-
-    try {
-        $remaining = @(Get-LSUpdate)
+        Stop-Logging
     } catch {
-        Log -Level ERROR -Message "Final Get-LSUpdate failed: $($_.Exception.Message)"
+        Log -Level ERROR -Message "Fatal script error: $($_.Exception.Message)"
+
+        Send-InstallStatus `
+            -Stage "fatal" `
+            -Status "failed" `
+            -Message "Fatal Lenovo update script error" `
+            -CurrentStep "Start-LenovoUpdates" `
+            -Extra @{
+                Error = $_.Exception.Message
+                StackTrace = $_.ScriptStackTrace
+            }
+
         Stop-Logging
         throw
     }
-
-    if ($remaining.Count -eq 0) {
-        Complete-Run
-        return
-    }
-
-    Log -Level WARN -Message "$($remaining.Count) update(s) still remain after max rounds."
-    Log -Level WARN -Message "Scheduled task will remain so the script can retry after next startup."
-    Stop-Logging
 }
 
 Start-LenovoUpdates
