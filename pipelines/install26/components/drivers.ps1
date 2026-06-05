@@ -290,16 +290,19 @@ function Register-ResumeTask {
         -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`" -Resume -AutoRun"
 
     $trigger = New-ScheduledTaskTrigger -AtStartup
+    $trigger.Delay = [System.Xml.XmlConvert]::ToString((New-TimeSpan -Minutes 2))
 
     $principal = New-ScheduledTaskPrincipal `
         -UserId "SYSTEM" `
+        -LogonType ServiceAccount `
         -RunLevel Highest
 
     $settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
         -DontStopIfGoingOnBatteries `
         -StartWhenAvailable `
-        -MultipleInstances IgnoreNew
+        -MultipleInstances IgnoreNew `
+        -ExecutionTimeLimit (New-TimeSpan -Hours 3)
 
     Register-ScheduledTask `
         -TaskName $TaskName `
@@ -309,7 +312,9 @@ function Register-ResumeTask {
         -Settings $settings `
         -Force | Out-Null
 
-    Log -Level SUCCESS -Message "Resume task registered."
+    $createdTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+    Log -Level SUCCESS -Message "Resume task registered. State: $($createdTask.State)"
+
 }
 
 function Remove-ResumeTask {
