@@ -15,11 +15,39 @@ $LogDir           = Join-Path $BaseDir "Logs"
 $TaskName         = "Arjo Lenovo Updates Resume"
 $CompletedFile    = Join-Path $BaseDir "LenovoUpdatesCompleted.txt"
 
+$MutexName        = "Global\ArjoLenovoUpdatesMutex"
+$script:Mutex     = $null
+
 function Get-SerialNumber {
-    try {
-        return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber
-    } catch {
-        return $null
+    try { return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber }
+    catch { return $null }
+}
+
+function Log {
+    param(
+        [ValidateSet("INFO","SUCCESS","WARN","ERROR","HEADER")][string]$Level,
+        [string]$Message
+    )
+
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $line = "[$timestamp] [$Level] $Message"
+
+    if ($script:LogFile) {
+        Add-Content -LiteralPath $script:LogFile -Value $line -ErrorAction SilentlyContinue
+    }
+
+    $map = @{
+        INFO    = "Cyan"
+        SUCCESS = "Green"
+        WARN    = "Yellow"
+        ERROR   = "Red"
+        HEADER  = "Magenta"
+    }
+
+    if ($Level -eq "HEADER") {
+        Write-Host "`n==== $Message ====" -ForegroundColor $map[$Level]
+    } else {
+        Write-Host $line -ForegroundColor $map[$Level]
     }
 }
 
@@ -63,35 +91,42 @@ function Send-InstallStatus {
     }
 }
 
-function Log {
-    param(
-        [ValidateSet("INFO","SUCCESS","WARN","ERROR","HEADER")][string]$Level,
-        [string]$Message
-    )
+function Start-SingleInstanceLock {
+    try {
+        $createdNew = $false
+        $script:Mutex = New-Object System.Threading.Mutex($true, $MutexName, [ref]$createdNew)
 
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $line = "[$timestamp] [$Level] $Message"
+        if (-not $createdNew) {
+            Log -Level WARN -Message "Another Lenovo update instance is already running. Exiting duplicate instance."
 
-    if ($script:LogFile) {
-        Add-Content -LiteralPath $script:LogFile -Value $line -ErrorAction SilentlyContinue
-    }
+            Send-InstallStatus `
+                -Stage "startup" `
+                -Status "warning" `
+                -Message "Another Lenovo update instance is already running. Exiting duplicate instance." `
+                -CurrentStep "SingleInstanceLock"
 
-    $map = @{
-        INFO    = "Cyan"
-        SUCCESS = "Green"
-        WARN    = "Yellow"
-        ERROR   = "Red"
-        HEADER  = "Magenta"
-    }
+            Stop-Logging
+            exit 0
+        }
 
-    if ($Level -eq "HEADER") {
-        Write-Host "`n==== $Message ====" -ForegroundColor $map[$Level]
-    } else {
-        Write-Host $line -ForegroundColor $map[$Level]
+        Log -Level SUCCESS -Message "Single-instance lock acquired."
+    } catch {
+        Log -Level WARN -Message "Could not create mutex lock: $($_.Exception.Message)"
     }
 }
 
+function Stop-SingleInstanceLock {
+    try {
+        if ($script:Mutex) {
+            $script:Mutex.ReleaseMutex()
+            $script:Mutex.Dispose()
+            $script:Mutex = $null
+        }
+    } catch {}
+}
+
 function Stop-Logging {
+    Stop-SingleInstanceLock
     try { Stop-Transcript | Out-Null } catch {}
 }
 
@@ -132,7 +167,12 @@ function Ensure-LocalScript {
     Ensure-Folders
 
     Log -Level INFO -Message "Downloading latest script to: $LocalScriptPath"
-    Send-InstallStatus -Stage "bootstrap" -Status "running" -Message "Downloading latest Lenovo update script" -CurrentStep "Ensure-LocalScript"
+
+    Send-InstallStatus `
+        -Stage "bootstrap" `
+        -Status "running" `
+        -Message "Downloading latest Lenovo update script" `
+        -CurrentStep "Ensure-LocalScript"
 
     Invoke-WebRequest -Uri $ScriptUrl -OutFile $LocalScriptPath -UseBasicParsing -ErrorAction Stop
 
@@ -141,7 +181,12 @@ function Ensure-LocalScript {
 
 function Register-ResumeTask {
     Log -Level INFO -Message "Registering startup resume task: $TaskName"
-    Send-InstallStatus -Stage "scheduled-task" -Status "running" -Message "Registering resume task" -CurrentStep "Register-ResumeTask"
+
+    Send-InstallStatus `
+        -Stage "scheduled-task" `
+        -Status "running" `
+        -Message "Registering resume task" `
+        -CurrentStep "Register-ResumeTask"
 
     $action = New-ScheduledTaskAction `
         -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
@@ -182,7 +227,12 @@ function Remove-ResumeTask {
 
 function Ensure-LSUClient {
     Log -Level INFO -Message "Preparing PowerShell Gallery / NuGet / LSUClient..."
-    Send-InstallStatus -Stage "lsuclient" -Status "running" -Message "Preparing LSUClient module" -CurrentStep "Ensure-LSUClient"
+
+    Send-InstallStatus `
+        -Stage "lsuclient" `
+        -Status "running" `
+        -Message "Preparing LSUClient module" `
+        -CurrentStep "Ensure-LSUClient"
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -203,9 +253,13 @@ function Ensure-LSUClient {
         Set-PSRepository -Name PSGallery -InstallationPolicy $oldPolicy -ErrorAction SilentlyContinue
         Log -Level SUCCESS -Message "LSUClient ready."
     } catch {
-        Send-InstallStatus -Stage "lsuclient" -Status "failed" -Message "Failed to install LSUClient" -CurrentStep "Ensure-LSUClient" -Extra @{
-            Error = $_.Exception.Message
-        }
+        Send-InstallStatus `
+            -Stage "lsuclient" `
+            -Status "failed" `
+            -Message "Failed to install LSUClient" `
+            -CurrentStep "Ensure-LSUClient" `
+            -Extra @{ Error = $_.Exception.Message }
+
         throw
     }
 }
@@ -250,13 +304,23 @@ function Start-LenovoUpdates {
     Log -Level INFO -Message "Computer: $env:COMPUTERNAME"
     Log -Level INFO -Message "User context: $([Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 
-    Send-InstallStatus -Stage "startup" -Status "running" -Message "Lenovo update script started" -CurrentStep "Start-LenovoUpdates"
+    Send-InstallStatus `
+        -Stage "startup" `
+        -Status "running" `
+        -Message "Lenovo update script started" `
+        -CurrentStep "Start-LenovoUpdates"
+
+    Start-SingleInstanceLock
 
     try {
         if (-not (Test-IsAdmin)) {
             Log -Level WARN -Message "Not running elevated. Relaunching as admin..."
 
-            Send-InstallStatus -Stage "elevation" -Status "running" -Message "Relaunching script as administrator" -CurrentStep "Elevation"
+            Send-InstallStatus `
+                -Stage "elevation" `
+                -Status "running" `
+                -Message "Relaunching script as administrator" `
+                -CurrentStep "Elevation"
 
             Ensure-LocalScript
 
@@ -364,14 +428,21 @@ function Start-LenovoUpdates {
                 $i++
             }
 
-            if (Test-PendingReboot) {
-                Log -Level WARN -Message "Pending reboot detected. Rebooting in 30 seconds. Script will resume at startup."
+            $needsReboot = Test-PendingReboot
+
+            if ($updates.Count -gt 0 -or $needsReboot) {
+                Log -Level WARN -Message "Updates were installed or reboot is pending. Rebooting in 30 seconds. Script will resume at startup."
 
                 Send-InstallStatus `
                     -Stage "reboot" `
                     -Status "rebooting" `
-                    -Message "Pending reboot detected. Rebooting in 30 seconds." `
-                    -CurrentStep "Restart-Computer"
+                    -Message "Updates were installed or reboot is pending. Rebooting in 30 seconds." `
+                    -CurrentStep "Restart-Computer" `
+                    -Extra @{
+                        UpdatesInstalledThisRound = $updates.Count
+                        PendingRebootDetected = $needsReboot
+                        Round = $Round
+                    }
 
                 Stop-Logging
                 Start-Sleep -Seconds 30
