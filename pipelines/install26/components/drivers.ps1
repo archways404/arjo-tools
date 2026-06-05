@@ -14,13 +14,14 @@
 # ==============================================================================
 
 param(
-    [switch]$Resume
+    [switch]$Resume,
+    [switch]$AutoRun
 )
 
 # ----------------------------------------------------------------------
 # URLs
 # ----------------------------------------------------------------------
-$ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/components/lenovo-updates.ps1"
+$ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/drivers.ps1"
 $StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
 
 # ----------------------------------------------------------------------
@@ -286,7 +287,7 @@ function Register-ResumeTask {
 
     $action = New-ScheduledTaskAction `
         -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
-        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`" -Resume"
+        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`" -Resume -AutoRun"
 
     $trigger = New-ScheduledTaskTrigger -AtStartup
 
@@ -425,7 +426,7 @@ function Start-LenovoUpdates {
             Ensure-LocalScript
 
             Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
-                -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`"" `
+                -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`" -AutoRun" `
                 -Verb RunAs
 
             Stop-Logging
@@ -444,12 +445,15 @@ function Start-LenovoUpdates {
             Log -Level HEADER -Message "Round $Round of $MaxRounds"
 
             Send-InstallStatus `
-                -Stage "scan" `
+                -Stage "lenovo-scan" `
                 -Status "running" `
                 -Message "Scanning for Lenovo updates" `
                 -CurrentStep "Get-LSUpdate" `
                 -CompletedSteps ($Round - 1) `
-                -TotalSteps $MaxRounds
+                -TotalSteps $MaxRounds `
+                -Extra @{
+                    Round = $Round
+                }
 
             $updates = @(Get-LSUpdate -Verbose)
 
@@ -461,20 +465,70 @@ function Start-LenovoUpdates {
             }
 
             Send-InstallStatus `
-                -Stage "download" `
+                -Stage "lenovo-download" `
                 -Status "running" `
-                -Message "$($updates.Count) Lenovo update(s) found. Downloading packages." `
+                -Message "$($updates.Count) Lenovo update(s) found. Starting downloads." `
                 -CurrentStep "Save-LSUpdate" `
                 -CompletedSteps 0 `
                 -TotalSteps $updates.Count `
                 -Extra @{
+                    Round = $Round
                     UpdateCount = $updates.Count
                     Updates = @($updates | ForEach-Object { $_.Title })
                 }
 
-            $updates | Save-LSUpdate -Verbose
+            $d = 1
 
-            Log -Level SUCCESS -Message "All updates downloaded."
+            foreach ($update in $updates) {
+                Send-InstallStatus `
+                    -Stage "lenovo-download" `
+                    -Status "running" `
+                    -Message "Downloading Lenovo update $d of $($updates.Count): $($update.Title)" `
+                    -CurrentStep $update.Title `
+                    -CompletedSteps ($d - 1) `
+                    -TotalSteps $updates.Count `
+                    -Extra @{
+                        Round = $Round
+                        UpdateTitle = $update.Title
+                        DownloadIndex = $d
+                    }
+
+                try {
+                    $update | Save-LSUpdate -Verbose
+
+                    Send-InstallStatus `
+                        -Stage "lenovo-download" `
+                        -Status "running" `
+                        -Message "Downloaded Lenovo update $d of $($updates.Count): $($update.Title)" `
+                        -CurrentStep $update.Title `
+                        -CompletedSteps $d `
+                        -TotalSteps $updates.Count `
+                        -Extra @{
+                            Round = $Round
+                            UpdateTitle = $update.Title
+                            DownloadIndex = $d
+                        }
+                } catch {
+                    Log -Level ERROR -Message "Failed downloading $($update.Title): $($_.Exception.Message)"
+
+                    Send-InstallStatus `
+                        -Stage "lenovo-download" `
+                        -Status "failed" `
+                        -Message "Failed downloading Lenovo update $d of $($updates.Count): $($update.Title)" `
+                        -CurrentStep $update.Title `
+                        -CompletedSteps ($d - 1) `
+                        -TotalSteps $updates.Count `
+                        -Extra @{
+                            Round = $Round
+                            UpdateTitle = $update.Title
+                            Error = $_.Exception.Message
+                        }
+                }
+
+                $d++
+            }
+
+            Log -Level SUCCESS -Message "Download phase completed."
 
             $i = 1
 
@@ -483,15 +537,16 @@ function Start-LenovoUpdates {
                 Log -Level INFO -Message "$($update.Title)"
 
                 Send-InstallStatus `
-                    -Stage "install" `
+                    -Stage "lenovo-install" `
                     -Status "running" `
-                    -Message "Installing Lenovo update: $($update.Title)" `
+                    -Message "Installing Lenovo update $i of $($updates.Count): $($update.Title)" `
                     -CurrentStep $update.Title `
                     -CompletedSteps ($i - 1) `
                     -TotalSteps $updates.Count `
                     -Extra @{
                         Round = $Round
                         UpdateTitle = $update.Title
+                        InstallIndex = $i
                     }
 
                 try {
@@ -501,27 +556,34 @@ function Start-LenovoUpdates {
                         -SaveBIOSUpdateInfoToRegistry
 
                     Send-InstallStatus `
-                        -Stage "install" `
+                        -Stage "lenovo-install" `
                         -Status "running" `
-                        -Message "Installed Lenovo update: $($update.Title)" `
+                        -Message "Installed Lenovo update $i of $($updates.Count): $($update.Title)" `
                         -CurrentStep $update.Title `
                         -CompletedSteps $i `
-                        -TotalSteps $updates.Count
+                        -TotalSteps $updates.Count `
+                        -Extra @{
+                            Round = $Round
+                            UpdateTitle = $update.Title
+                            InstallIndex = $i
+                        }
 
                     Log -Level SUCCESS -Message "Installed: $($update.Title)"
                 } catch {
                     Log -Level ERROR -Message "Failed installing $($update.Title): $($_.Exception.Message)"
 
                     Send-InstallStatus `
-                        -Stage "install" `
+                        -Stage "lenovo-install" `
                         -Status "failed" `
-                        -Message "Failed installing Lenovo update: $($update.Title)" `
+                        -Message "Failed installing Lenovo update $i of $($updates.Count): $($update.Title)" `
                         -CurrentStep $update.Title `
                         -CompletedSteps ($i - 1) `
                         -TotalSteps $updates.Count `
                         -Extra @{
+                            Round = $Round
                             Error = $_.Exception.Message
                             UpdateTitle = $update.Title
+                            InstallIndex = $i
                         }
                 }
 
@@ -530,8 +592,6 @@ function Start-LenovoUpdates {
 
             $needsReboot = Test-PendingReboot
 
-            # Lenovo packages do not always set Windows reboot flags correctly.
-            # For reliability, reboot after any batch where updates were found.
             if ($updates.Count -gt 0 -or $needsReboot) {
                 Log -Level WARN -Message "Updates were installed or reboot is pending. Rebooting in 30 seconds. Script will resume at startup."
 
@@ -591,4 +651,8 @@ function Start-LenovoUpdates {
         Stop-Logging
         throw
     }
+}
+
+if ($AutoRun) {
+    Start-LenovoUpdates
 }
