@@ -75,6 +75,31 @@ function Log {
     }
 }
 
+
+function Wait-ForNetwork {
+    param(
+        [int]$TimeoutSeconds = 300,
+        [int]$RetrySeconds = 10
+    )
+
+    Log -Level INFO -Message "Waiting for network/API availability..."
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+
+    while ((Get-Date) -lt $deadline) {
+        if (Test-StatusApiAvailable) {
+            Log -Level SUCCESS -Message "Network/API is available."
+            return $true
+        }
+
+        Log -Level WARN -Message "Network/API not ready yet. Retrying in $RetrySeconds seconds..."
+        Start-Sleep -Seconds $RetrySeconds
+    }
+
+    Log -Level WARN -Message "Network/API did not become available within $TimeoutSeconds seconds. Continuing anyway."
+    return $false
+}
+
 function Get-SerialNumber {
     try {
         return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber
@@ -297,12 +322,14 @@ function Register-ResumeTask {
         -LogonType ServiceAccount `
         -RunLevel Highest
 
-    $settings = New-ScheduledTaskSettingsSet `
-        -AllowStartIfOnBatteries `
-        -DontStopIfGoingOnBatteries `
-        -StartWhenAvailable `
-        -MultipleInstances IgnoreNew `
-        -ExecutionTimeLimit (New-TimeSpan -Hours 3)
+        $settings = New-ScheduledTaskSettingsSet `
+            -AllowStartIfOnBatteries `
+            -DontStopIfGoingOnBatteries `
+            -StartWhenAvailable `
+            -MultipleInstances IgnoreNew `
+            -RestartCount 5 `
+            -RestartInterval (New-TimeSpan -Minutes 5) `
+            -ExecutionTimeLimit (New-TimeSpan -Hours 3)
 
     Register-ScheduledTask `
         -TaskName $TaskName `
@@ -409,6 +436,12 @@ function Start-LenovoUpdates {
     # Important: acquire the lock before sending startup status.
     # This avoids duplicate elevated windows both reporting "running".
     Start-SingleInstanceLock
+
+    # After reboot, network/services may not be ready yet.
+
+    # Wait here before trying to report status or scan Lenovo updates.
+
+    Wait-ForNetwork -TimeoutSeconds 300 -RetrySeconds 10 | Out-Null
 
     Send-InstallStatus `
         -Stage "startup" `
