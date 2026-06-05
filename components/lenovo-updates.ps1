@@ -1,26 +1,49 @@
 # ==============================================================================
 # Lenovo System Updates — LSUClient auto-resume after reboot + install status API
+#
+# What this script does:
+# - Runs Lenovo updates using LSUClient
+# - Downloads packages before installing
+# - Registers a startup scheduled task so it can continue after reboot
+# - Runs as SYSTEM after reboot, no login required
+# - Reports progress to install-status API
+# - Queues status messages locally if network/API is unavailable
+# - Prevents duplicate instances with a global mutex lock
+# - Reboots after each install batch, then resumes
+# - Removes scheduled task when no updates remain
 # ==============================================================================
 
 param(
     [switch]$Resume
 )
 
+# ----------------------------------------------------------------------
+# URLs
+# ----------------------------------------------------------------------
 $ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/components/lenovo-updates.ps1"
 $StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
 
+# ----------------------------------------------------------------------
+# Local paths
+# ----------------------------------------------------------------------
 $BaseDir          = "C:\ProgramData\ArjoTools"
 $LocalScriptPath  = Join-Path $BaseDir "lenovo-updates.ps1"
 $LogDir           = Join-Path $BaseDir "Logs"
 $TaskName         = "Arjo Lenovo Updates Resume"
 $CompletedFile    = Join-Path $BaseDir "LenovoUpdatesCompleted.txt"
+$StatusQueueFile  = Join-Path $BaseDir "install-status-queue.jsonl"
 
+# ----------------------------------------------------------------------
+# Single-instance lock
+# Prevents two elevated windows / scheduled task instances from running together.
+# ----------------------------------------------------------------------
 $MutexName        = "Global\ArjoLenovoUpdatesMutex"
 $script:Mutex     = $null
+$script:LogFile   = $null
 
-function Get-SerialNumber {
-    try { return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber }
-    catch { return $null }
+function Ensure-Folders {
+    New-Item -ItemType Directory -Path $BaseDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
 
 function Log {
@@ -51,6 +74,83 @@ function Log {
     }
 }
 
+function Get-SerialNumber {
+    try {
+        return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber
+    } catch {
+        return $null
+    }
+}
+
+function Test-StatusApiAvailable {
+    try {
+        Invoke-WebRequest `
+            -Uri $StatusApiUrl `
+            -Method GET `
+            -UseBasicParsing `
+            -TimeoutSec 5 `
+            -ErrorAction Stop | Out-Null
+
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Add-StatusToQueue {
+    param([string]$JsonBody)
+
+    try {
+        Ensure-Folders
+        Add-Content -LiteralPath $StatusQueueFile -Value $JsonBody -ErrorAction SilentlyContinue
+    } catch {}
+}
+
+function Flush-StatusQueue {
+    if (-not (Test-Path $StatusQueueFile)) {
+        return
+    }
+
+    if (-not (Test-StatusApiAvailable)) {
+        return
+    }
+
+    try {
+        $queued = Get-Content -LiteralPath $StatusQueueFile -ErrorAction Stop
+
+        if (-not $queued -or $queued.Count -eq 0) {
+            Remove-Item -LiteralPath $StatusQueueFile -Force -ErrorAction SilentlyContinue
+            return
+        }
+
+        $remaining = New-Object System.Collections.Generic.List[string]
+
+        foreach ($line in $queued) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+
+            try {
+                Invoke-RestMethod `
+                    -Uri $StatusApiUrl `
+                    -Method POST `
+                    -Body $line `
+                    -ContentType "application/json" `
+                    -TimeoutSec 10 `
+                    -ErrorAction Stop | Out-Null
+            } catch {
+                $remaining.Add($line)
+            }
+        }
+
+        if ($remaining.Count -eq 0) {
+            Remove-Item -LiteralPath $StatusQueueFile -Force -ErrorAction SilentlyContinue
+        } else {
+            Set-Content -LiteralPath $StatusQueueFile -Value $remaining -Force
+        }
+    } catch {}
+}
+
 function Send-InstallStatus {
     param(
         [string]$Stage,
@@ -62,23 +162,26 @@ function Send-InstallStatus {
         [hashtable]$Extra = @{}
     )
 
-    try {
-        $body = @{
-            PCName         = $env:COMPUTERNAME
-            Serial         = Get-SerialNumber
-            Stage          = $Stage
-            Status         = $Status
-            Message        = $Message
-            CurrentStep    = $CurrentStep
-            CompletedSteps = $CompletedSteps
-            TotalSteps     = $TotalSteps
-            Resume         = [bool]$Resume
-            UserContext    = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-            LogFile        = $script:LogFile
-            Timestamp      = (Get-Date).ToString("o")
-            Extra          = $Extra
-        } | ConvertTo-Json -Depth 10
+    $body = @{
+        PCName         = $env:COMPUTERNAME
+        Serial         = Get-SerialNumber
+        Stage          = $Stage
+        Status         = $Status
+        Message        = $Message
+        CurrentStep    = $CurrentStep
+        CompletedSteps = $CompletedSteps
+        TotalSteps     = $TotalSteps
+        Resume         = [bool]$Resume
+        UserContext    = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        LogFile        = $script:LogFile
+        Timestamp      = (Get-Date).ToString("o")
+        Extra          = $Extra
+    } | ConvertTo-Json -Depth 10 -Compress
 
+    # Try to send old queued messages before sending the new one.
+    Flush-StatusQueue
+
+    try {
         Invoke-RestMethod `
             -Uri $StatusApiUrl `
             -Method POST `
@@ -87,7 +190,8 @@ function Send-InstallStatus {
             -TimeoutSec 10 `
             -ErrorAction Stop | Out-Null
     } catch {
-        Log -Level WARN -Message "Failed sending install status: $($_.Exception.Message)"
+        Add-StatusToQueue -JsonBody $body
+        Log -Level WARN -Message "Failed sending install status. Queued locally: $($_.Exception.Message)"
     }
 }
 
@@ -98,13 +202,6 @@ function Start-SingleInstanceLock {
 
         if (-not $createdNew) {
             Log -Level WARN -Message "Another Lenovo update instance is already running. Exiting duplicate instance."
-
-            Send-InstallStatus `
-                -Stage "startup" `
-                -Status "warning" `
-                -Message "Another Lenovo update instance is already running. Exiting duplicate instance." `
-                -CurrentStep "SingleInstanceLock"
-
             Stop-Logging
             exit 0
         }
@@ -135,7 +232,9 @@ function Test-IsSystem {
 }
 
 function Test-IsAdmin {
-    if (Test-IsSystem) { return $true }
+    if (Test-IsSystem) {
+        return $true
+    }
 
     return ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
         [Security.Principal.WindowsBuiltInRole]::Administrator
@@ -152,15 +251,12 @@ function Test-PendingReboot {
             -Name PendingFileRenameOperations `
             -ErrorAction SilentlyContinue
 
-        if ($pending.PendingFileRenameOperations) { return $true }
+        if ($pending.PendingFileRenameOperations) {
+            return $true
+        }
     } catch {}
 
     return $false
-}
-
-function Ensure-Folders {
-    New-Item -ItemType Directory -Path $BaseDir -Force | Out-Null
-    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
 
 function Ensure-LocalScript {
@@ -304,13 +400,17 @@ function Start-LenovoUpdates {
     Log -Level INFO -Message "Computer: $env:COMPUTERNAME"
     Log -Level INFO -Message "User context: $([Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 
+    # Important: acquire the lock before sending startup status.
+    # This avoids duplicate elevated windows both reporting "running".
+    Start-SingleInstanceLock
+
     Send-InstallStatus `
         -Stage "startup" `
         -Status "running" `
         -Message "Lenovo update script started" `
         -CurrentStep "Start-LenovoUpdates"
 
-    Start-SingleInstanceLock
+    Flush-StatusQueue
 
     try {
         if (-not (Test-IsAdmin)) {
@@ -430,6 +530,8 @@ function Start-LenovoUpdates {
 
             $needsReboot = Test-PendingReboot
 
+            # Lenovo packages do not always set Windows reboot flags correctly.
+            # For reliability, reboot after any batch where updates were found.
             if ($updates.Count -gt 0 -or $needsReboot) {
                 Log -Level WARN -Message "Updates were installed or reboot is pending. Rebooting in 30 seconds. Script will resume at startup."
 
