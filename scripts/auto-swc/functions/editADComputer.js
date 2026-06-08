@@ -49,7 +49,7 @@ export async function setDescription(page, description) {
   await page.waitForSelector(selector);
   await page.fill(selector, description);
   console.log("[ACTION] Description set");
-  await page.waitForTimeout(25000);
+  await page.waitForTimeout(2000);
 }
 
 export async function saveADComputer(page, { dryRun = false } = {}) {

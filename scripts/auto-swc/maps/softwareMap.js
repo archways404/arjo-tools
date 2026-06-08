@@ -13,9 +13,12 @@ const SOFTWARE_MAP = {
 };
 
 export function resolveSoftware(flags) {
-  return flags.map((flag) => {
-    const resolved = SOFTWARE_MAP[flag];
-    if (!resolved) throw new Error(`Unknown software flag: "${flag}"`);
-    return resolved;
-  });
+  return flags
+    .map((flag) => {
+      const resolved = SOFTWARE_MAP[flag];
+      if (!resolved)
+        console.warn(`[WARN] Unknown software flag "${flag}", skipping`);
+      return resolved;
+    })
+    .filter(Boolean);
 }

@@ -41,51 +41,52 @@ export async function searchPC(page, pcName) {
 
 export async function searchAndSelectSoftware(page, softwareName) {
   console.log(`[ACTION] Searching for software: ${softwareName}`);
+  const INPUT =
+    "#ctl00_ContentPlaceHolderMain_RadComboBoxAvailableSoftware_Input";
 
-  await page.waitForTimeout(2000);
+  // Clear any previous value first
+  await page.click(INPUT);
+  await page.keyboard.press("Control+a");
+  await page.keyboard.press("Delete");
+  await page.waitForTimeout(500);
+  await page.type(INPUT, softwareName, { delay: 100 });
 
-  await page.focus(
-    "#ctl00_ContentPlaceHolderMain_RadComboBoxAvailableSoftware_Input",
-  );
-  await page.click(
-    "#ctl00_ContentPlaceHolderMain_RadComboBoxAvailableSoftware_Input",
-  );
-
-  await page.type(
-    "#ctl00_ContentPlaceHolderMain_RadComboBoxAvailableSoftware_Input",
-    softwareName,
-    { delay: 100 },
-  );
-
-  // Wait for dropdown results to appear
-  await page.waitForSelector(".divTableCell label", { timeout: 15000 });
-
-  // Find the checkbox whose label matches the software name
-  const label = await page
-    .locator("label")
-    .filter({ hasText: softwareName })
-    .first();
-  const labelText = await label.textContent();
-
-  if (!labelText.includes(softwareName)) {
-    throw new Error(`Unexpected match: ${labelText}`);
+  // Wait for dropdown to appear
+  try {
+    await page.waitForSelector(".divTableCell label", { timeout: 3000 });
+  } catch {
+    console.warn(
+      `[SKIP] No results for "${softwareName}" — already installed or not found, skipping`,
+    );
+    await page.click(INPUT);
+    await page.keyboard.press("Control+a");
+    await page.keyboard.press("Delete");
+    return;
   }
 
-  console.log(`[ACTION] Found match: ${labelText.trim()}`);
+  const label = page.locator("label").filter({ hasText: softwareName }).first();
+  const count = await label.count();
+  if (count === 0) {
+    console.warn(
+      `[SKIP] "${softwareName}" not found in results — already installed or unavailable, skipping`,
+    );
+    await page.click(INPUT);
+    await page.keyboard.press("Control+a");
+    await page.keyboard.press("Delete");
+    return;
+  }
 
-  // Click the checkbox inside the matching label
+  const labelText = await label.textContent();
+  console.log(`[ACTION] Found match: ${labelText.trim()}`);
   await label.locator("input[type='checkbox']").click();
 
-  // Clear the search box after selecting
-  await page.click(
-    "#ctl00_ContentPlaceHolderMain_RadComboBoxAvailableSoftware_Input",
-  );
+  // Clear after selecting
+  await page.click(INPUT);
   await page.keyboard.press("Control+a");
   await page.keyboard.press("Delete");
 
   console.log(`[ACTION] Selected software: ${labelText.trim()}`);
 }
-
 export async function addSoftware(page, software) {
   const list = Array.isArray(software) ? software : [software];
   for (const name of list) {

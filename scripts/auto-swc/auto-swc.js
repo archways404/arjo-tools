@@ -82,20 +82,23 @@ async function run(page, entry) {
   // await withRetry("applyChanges",          () => applyChanges(page, { dryRun: DRY_RUN }));
 
   // EDIT AD COMPUTER
-  await withRetry("openEditADComputer", () => openEditADComputer(page));
-  await withRetry("searchPCEditADComputer", () =>
-    searchPCEditADComputer(page, pc),
-  );
-  await withRetry("setDescription", () => setDescription(page, adDescription));
-  await withRetry("saveADComputer", () =>
-    saveADComputer(page, { dryRun: DRY_RUN }),
-  );
+  // await withRetry("openEditADComputer", () => openEditADComputer(page));
+  // await withRetry("searchPCEditADComputer", () =>
+  //   searchPCEditADComputer(page, pc),
+  // );
+  // await withRetry("setDescription", () => setDescription(page, adDescription));
+  // await withRetry("saveADComputer", () =>
+  //   saveADComputer(page, { dryRun: DRY_RUN }),
+  // );
 
   // MANAGE SOFTWARE
-  // await withRetry("openManageSoftware", () => openManageSoftware(page));
-  // await withRetry("searchPC",           () => searchPC(page, pc));
-  // await withRetry("addSoftware",        () => addSoftware(page, softwareList));
-  // await withRetry("installSoftware",    () => installSoftware(page, { dryRun: DRY_RUN }));
+  await withRetry("openManageSoftware", () => openManageSoftware(page));
+  await withRetry("searchPC", () => searchPC(page, pc));
+  await addSoftware(page, softwareList);
+
+  await withRetry("installSoftware", () =>
+    installSoftware(page, { dryRun: DRY_RUN }),
+  );
 
   // SOFTWARE STATUS
   // await withRetry("openSoftwareStatus",      () => openSoftwareStatus(page));
