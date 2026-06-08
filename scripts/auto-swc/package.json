@@ -7,7 +7,7 @@
   "main": "auto-swc.js",
   "type": "module",
   "scripts": {
-    "dev": "node auto-swc.js",
+    "dev": "node auto-swc.js --dry-run",
     "prod": "node auto-swc.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -1,4 +1,4 @@
-software = [
+const SOFTWARE_MAP = {
   LogMeIn: "LogmeinLogmeinclient_4.1.16006_EN_01",
   AdobeAcrobat: "AdobeAcrobatDC_21_SSP_EN_01_(x64)",
   Teams: "MicrosoftTeams_25275.2601.4002.2815_EN_02_(x64)",
@@ -10,4 +10,12 @@ software = [
   PL23: "ProlificUSB-Serial-COM-Port_4.3.0.0_Driver_(x64)",
   TempLog: "ErlenGmbHTemplogger2_2.60_DE_01_(x86)",
   AFO: "AFO Service Applications (Group)",
-]
+};
+
+export function resolveSoftware(flags) {
+  return flags.map((flag) => {
+    const resolved = SOFTWARE_MAP[flag];
+    if (!resolved) throw new Error(`Unknown software flag: "${flag}"`);
+    return resolved;
+  });
+}
