@@ -69,23 +69,25 @@ function Invoke-LoggedCommand {
         [string]$Level = "INFO"
     )
 
-    $items = New-Object System.Collections.Generic.List[object]
+    $items = New-Object System.Collections.ArrayList
 
     try {
         & $Script 4>&1 | ForEach-Object {
-            $items.Add($_)
+            $item = $_
 
-            if ($_ -is [System.Management.Automation.VerboseRecord]) {
-                $text = $_.Message
+            [void]$items.Add([object]$item)
+
+            if ($item -is [System.Management.Automation.VerboseRecord]) {
+                $text = $item.Message
             } else {
-                $text = $_.ToString()
+                $text = "$item"
             }
 
             Send-UdpLog -Message "[$Level] $text"
             Write-Host $text
         }
 
-        return @($items)
+        return @($items.ToArray())
     } catch {
         Send-UdpLog -Message "[ERROR] $($_.Exception.Message)"
         throw
