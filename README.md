@@ -15,7 +15,7 @@
 
 ## 🔥 Ignition
 
-**Ignition** is an automated laptop provisioning pipeline built for ARJO device deployments. It takes a factory-fresh machine and brings it to a fully configured, update-ready state in one command — no manual steps, no babysitting.
+**Ignition** is an automated laptop provisioning pipeline built for ARJO device deployments. It takes a factory-fresh machine and brings it to a fully configured, update-ready state in one command — minimal manual intervention and remote visibility throughout the process.
 
 Currently powering the **NL2026 deployment** (NLTIE site, ~126 devices), with the goal of expanding to all ARJO sites.
 
