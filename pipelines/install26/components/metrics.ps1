@@ -49,7 +49,9 @@ function Send-PCInfo {
         Write-Host ""
         Write-Host "  Submitted data:" -ForegroundColor DarkGray
         $data.PSObject.Properties | ForEach-Object {
-            Write-Host ("  {0,-15} {1}" -f $_.Name, $_.Value) -ForegroundColor White
+            $line = ("  {0,-15} {1}" -f $_.Name, $_.Value)
+            Send-UdpLog -Message "[INFO] $line"
+            Write-Host $line -ForegroundColor White
         }
 
     } catch {
