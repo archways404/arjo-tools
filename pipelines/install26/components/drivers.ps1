@@ -23,7 +23,7 @@ param(
 # ----------------------------------------------------------------------
 $ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/drivers.ps1"
 $StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
-$UdpLogHost = "https://arjo-metrics.k14net.org"
+$UdpLogHost = "arjo-metrics.k14net.org"
 $UdpLogPort = 9999
 $script:UdpClient = $null
 
