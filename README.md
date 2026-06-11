@@ -13,14 +13,70 @@
  
 </div>
 
----
+## 🔥 Ignition
 
-## Automatic Setup (NL2026)
+**Ignition** is an automated laptop provisioning pipeline built for ARJO device deployments. It takes a factory-fresh machine and brings it to a fully configured, update-ready state in one command — no manual steps, no babysitting.
+
+Currently powering the **NL2026 deployment** (NLTIE site, ~126 devices), with the goal of expanding to all ARJO sites.
+
+### What it does
+
+Ignition runs a sequential pipeline of setup stages, reporting live progress to the arjo-metrics API after each step. Every stage streams console output to the server in real time via UDP, so you can monitor what's happening on any machine without being in front of it.
+
+| Stage | What happens |
+|:-----:|--------------|
+| **Power Settings** | Applies the standard ARJO power profile — lid close does nothing, AC sleep and monitor timeout set to never |
+| **Microsoft Teams** | Installs the latest Teams via winget or bootstrapper fallback if winget isn't available |
+| **PC Metrics** | Collects hardware info (name, model, serial, MAC, OS) and registers the device with arjo-metrics |
+| **Lenovo Drivers** | Runs a full LSUClient driver and firmware update cycle — downloads all packages, installs them, reboots automatically if needed, and resumes after reboot until no updates remain |
+
+The Lenovo driver stage is self-sustaining — it registers a scheduled task that survives reboots and keeps running as SYSTEM until every update is applied, then removes itself.
+
+### Run it
+
+Open **PowerShell** (admin recommended) and run:
+
 ```powershell
 irm https://arjo-metrics.k14net.org | iex
 ```
 
-## Quick Start
+That's it. The pipeline starts immediately and handles everything from there.
+
+### How it reports
+
+- **HTTP** — structured JSON status updates sent to `arjo-metrics.k14net.org/install-status` after each stage and substep. If the API is unreachable, updates are queued locally and flushed automatically once connectivity is restored.
+- **UDP** — raw console output streamed line by line to port `9999` on the metrics server, giving a live feed of exactly what each machine is doing.
+
+### Notes
+
+- Designed for **Lenovo hardware** — the driver stage uses LSUClient and is specific to Lenovo devices.
+- The Lenovo update stage will reboot the machine up to 5 times if needed. This is expected — the scheduled task resumes automatically after each reboot with no user interaction required.
+- The pipeline is currently scoped to the NL2026 deployment but is built to be site-agnostic. Expanding to other ARJO sites is planned.
+
+---
+
+### Step 2 — auto-swc
+
+Once Ignition has finished and the machine is fully updated, **auto-swc** handles the SoftwareCentral and device management configuration. This is a separate Playwright-based Node.js automation tool that runs after Ignition and takes care of everything that requires interacting with external systems on behalf of the device.
+
+#### What it automates
+
+| Task | Description |
+|:----:|-------------|
+| **Device naming in LogMeIn** | Renames the device in LogMeIn to the correct ARJO naming convention |
+| **Device naming in SWC** | Sets the device name in SoftwareCentral to match |
+| **Application install queue** | Adds the required applications to the SWC install queue for the device based on its department/role |
+| **Device template assignment** | Assigns the correct SWC device template |
+| **Locale & regional settings** | Configures locale, language, and regional settings appropriate for the target site |
+| **AD description** | Sets the Active Directory description field for the device |
+
+#### How it works
+
+auto-swc is driven by a batch config file (`ini.json`) per department, so the same tool handles different device roles without any manual input per machine. You load the config for the relevant department, point it at the list of devices, and it processes the entire batch automatically.
+
+---
+
+## Quick Start (Interactive Menu)
  
 Open **PowerShell** and run:
 
@@ -65,11 +121,8 @@ An interactive menu will appear — pick what you need, then press `0` to exit w
  
 - Windows PowerShell **5.1 or later**
 - **Admin privileges recommended** — required for printer installation and power settings
----
  
 &nbsp;
- 
----
  
 ## Advanced & Optional
  
@@ -121,6 +174,14 @@ iex (irm "https://raw.githubusercontent.com/archways404/arjo-tools/master/ThinkS
 ```
 arjo-tools/
 ├── main.ps1                                   # Interactive menu entrypoint
+├── pipelines/
+│   └── install26/                             # arjo-ignition pipeline (NL2026 deployment)
+│       ├── install26.ps1                      # Pipeline entrypoint — runs all stages in order
+│       └── components/
+│           ├── power.ps1                      # Power settings stage
+│           ├── teams.ps1                      # Microsoft Teams install stage
+│           ├── metrics.ps1                    # PC info collection + reporting stage
+│           └── drivers.ps1                    # Lenovo driver/firmware update stage (auto-resume)
 └── components/
    ├── printers.ps1                            # Printer installation (exposes Add-Printers)
    ├── power.ps1                               # Power configuration (exposes Set-PowerSettings)
