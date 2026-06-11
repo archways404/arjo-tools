@@ -69,14 +69,23 @@ function Invoke-LoggedCommand {
         [string]$Level = "INFO"
     )
 
+    $items = New-Object System.Collections.Generic.List[object]
+
     try {
-        $output = & $Script *>&1
-        foreach ($line in $output) {
-            $text = $line.ToString()
+        & $Script 4>&1 | ForEach-Object {
+            $items.Add($_)
+
+            if ($_ -is [System.Management.Automation.VerboseRecord]) {
+                $text = $_.Message
+            } else {
+                $text = $_.ToString()
+            }
+
             Send-UdpLog -Message "[$Level] $text"
             Write-Host $text
         }
-        return $output
+
+        return @($items)
     } catch {
         Send-UdpLog -Message "[ERROR] $($_.Exception.Message)"
         throw
@@ -567,18 +576,14 @@ Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -
                 -Extra @{
                     Round = $Round
                 }
-                $updates = @()
-                $updates = @(Get-LSUpdate -Verbose 4>&1 | Tee-Object -Variable rawOutput | Where-Object {
-                    $_ -isnot [System.Management.Automation.VerboseRecord]
-                })
-                $verboseLines = @(
+                $rawOutput = Invoke-LoggedCommand {
+                    Get-LSUpdate -Verbose
+                } "INFO"
+                $updates = @(
                     $rawOutput | Where-Object {
-                        $_ -is [System.Management.Automation.VerboseRecord]
-                    } | ForEach-Object {
-                        $_.Message
+                        $_ -isnot [System.Management.Automation.VerboseRecord]
                     }
                 )
-                Send-UdpLines -Lines $verboseLines -Level "INFO"
                 Log -Level INFO -Message "$($updates.Count) update(s) found."
 
             if ($updates.Count -eq 0) {
