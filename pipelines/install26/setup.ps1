@@ -52,7 +52,12 @@ function Send-UdpLog {
 }
 
 function Close-UdpLogger {
-    try { $script:UdpClient?.Close() } catch {}
+    try {
+        if ($script:UdpClient) {
+            $script:UdpClient.Close()
+            $script:UdpClient = $null
+        }
+    } catch {}
 }
 
 function Get-SerialNumber {
@@ -139,6 +144,8 @@ function Invoke-PipelineScript {
     }
 }
 
+Init-UdpLogger
+
 Write-Host ""
 Write-Host "=======================================" -ForegroundColor Cyan
 Write-Host "     arjo-tools  |  Install26 Setup    " -ForegroundColor Cyan
@@ -198,3 +205,5 @@ foreach ($step in $steps) {
 }
 
 Log -Level SUCCESS -Message "Pipeline completed. Lenovo task may continue after reboot."
+
+Close-UdpLogger

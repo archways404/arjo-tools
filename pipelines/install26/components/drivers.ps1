@@ -100,7 +100,12 @@ function Send-UdpLog {
 }
 
 function Close-UdpLogger {
-    try { $script:UdpClient?.Close() } catch {}
+    try {
+        if ($script:UdpClient) {
+            $script:UdpClient.Close()
+            $script:UdpClient = $null
+        }
+    } catch {}
 }
 
 function Wait-ForNetwork {
@@ -276,6 +281,7 @@ function Stop-SingleInstanceLock {
 }
 
 function Stop-Logging {
+    Close-UdpLogger
     Stop-SingleInstanceLock
     try { Stop-Transcript | Out-Null } catch {}
 }
@@ -447,6 +453,8 @@ LogFile: $script:LogFile
 
 function Start-LenovoUpdates {
     Ensure-Folders
+
+    Init-UdpLogger
 
     $script:LogFile = Join-Path $LogDir "lsuclient_$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
 
