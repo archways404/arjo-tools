@@ -32,6 +32,39 @@ function Log {
     Write-Host "$prefix$Message" -ForegroundColor $color
 }
 
+function Send-UdpLines {
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Lines,
+        [string]$Level = "INFO"
+    )
+    foreach ($line in $Lines) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        Send-UdpLog -Message "[$Level] $line"
+    }
+}
+
+function Invoke-LoggedCommand {
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock]$Script,
+        [string]$Level = "INFO"
+    )
+
+    try {
+        $output = & $Script *>&1
+        foreach ($line in $output) {
+            $text = $line.ToString()
+            Send-UdpLog -Message "[$Level] $text"
+            Write-Host $text
+        }
+        return $output
+    } catch {
+        Send-UdpLog -Message "[ERROR] $($_.Exception.Message)"
+        throw
+    }
+}
+
 function Init-UdpLogger {
     try {
         $script:UdpClient = New-Object System.Net.Sockets.UdpClient

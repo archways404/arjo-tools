@@ -50,6 +50,39 @@ function Ensure-Folders {
     New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
 
+function Send-UdpLines {
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Lines,
+        [string]$Level = "INFO"
+    )
+    foreach ($line in $Lines) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        Send-UdpLog -Message "[$Level] $line"
+    }
+}
+
+function Invoke-LoggedCommand {
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock]$Script,
+        [string]$Level = "INFO"
+    )
+
+    try {
+        $output = & $Script *>&1
+        foreach ($line in $output) {
+            $text = $line.ToString()
+            Send-UdpLog -Message "[$Level] $text"
+            Write-Host $text
+        }
+        return $output
+    } catch {
+        Send-UdpLog -Message "[ERROR] $($_.Exception.Message)"
+        throw
+    }
+}
+
 function Log {
     param(
         [ValidateSet("INFO","SUCCESS","WARN","ERROR","HEADER")][string]$Level,
@@ -528,9 +561,25 @@ function Start-LenovoUpdates {
                     Round = $Round
                 }
 
-            $updates = @(Get-LSUpdate -Verbose)
+                $updates = @()
+                $verboseOutput = Get-LSUpdate -Verbose 4>&1
 
-            Log -Level INFO -Message "$($updates.Count) update(s) found."
+                $updates = @(
+                    $verboseOutput | Where-Object {
+                        $_ -isnot [System.Management.Automation.VerboseRecord]
+                    }
+                )
+
+                $verboseLines = @(
+                    $verboseOutput | Where-Object {
+                        $_ -is [System.Management.Automation.VerboseRecord]
+                    } | ForEach-Object {
+                        $_.Message
+                    }
+                )
+
+                Send-UdpLines -Lines $verboseLines -Level "INFO"
+                Log -Level INFO -Message "$($updates.Count) update(s) found."
 
             if ($updates.Count -eq 0) {
                 Complete-Run
@@ -567,7 +616,7 @@ function Start-LenovoUpdates {
                     }
 
                 try {
-                    $update | Save-LSUpdate -Verbose
+                  Invoke-LoggedCommand { $update | Save-LSUpdate -Verbose } "INFO" | Out-Null
 
                     Send-InstallStatus `
                         -Stage "lenovo-download" `
@@ -623,10 +672,12 @@ function Start-LenovoUpdates {
                     }
 
                 try {
-                    Install-LSUpdate `
-                        -Package $update `
-                        -Verbose `
-                        -SaveBIOSUpdateInfoToRegistry
+                  Invoke-LoggedCommand {
+                      Install-LSUpdate `
+                            -Package $update `
+                            -Verbose `
+                            -SaveBIOSUpdateInfoToRegistry
+                  } "INFO" | Out-Null
 
                     Send-InstallStatus `
                         -Stage "lenovo-install" `
