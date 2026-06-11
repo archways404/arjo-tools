@@ -19,10 +19,13 @@ param(
 )
 
 # ----------------------------------------------------------------------
-# URLs
+# URLs & Ports
 # ----------------------------------------------------------------------
 $ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/drivers.ps1"
 $StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
+$UdpLogHost = "https://arjo-metrics.k14net.org"
+$UdpLogPort = 9999
+$script:UdpClient = $null
 
 # ----------------------------------------------------------------------
 # Local paths
@@ -53,6 +56,8 @@ function Log {
         [string]$Message
     )
 
+    Send-UdpLog -Message "[$Level] $Message"
+
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "[$timestamp] [$Level] $Message"
 
@@ -75,6 +80,28 @@ function Log {
     }
 }
 
+function Init-UdpLogger {
+    try {
+        $script:UdpClient = New-Object System.Net.Sockets.UdpClient
+        $script:UdpClient.Connect($UdpLogHost, $UdpLogPort)
+    } catch {
+        # silent — UDP logging is best-effort
+    }
+}
+
+function Send-UdpLog {
+    param([string]$Message)
+    try {
+        if (-not $script:UdpClient) { return }
+        $line = "$($env:COMPUTERNAME) | $(Get-Date -Format 'HH:mm:ss') | $Message"
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
+        $script:UdpClient.Send($bytes, $bytes.Length) | Out-Null
+    } catch {}
+}
+
+function Close-UdpLogger {
+    try { $script:UdpClient?.Close() } catch {}
+}
 
 function Wait-ForNetwork {
     param(
