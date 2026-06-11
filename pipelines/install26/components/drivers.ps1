@@ -520,24 +520,31 @@ function Start-LenovoUpdates {
     Flush-StatusQueue
 
     try {
-        if (-not (Test-IsAdmin)) {
-            Log -Level WARN -Message "Not running elevated. Relaunching as admin..."
+    if (-not (Test-IsAdmin)) {
+        Log -Level WARN -Message "Not running elevated. Relaunching as admin..."
+        Send-InstallStatus `
+          -Stage "elevation" `
+          -Status "running" `
+          -Message "Relaunching script as administrator" `
+          -CurrentStep "Elevation"
 
-            Send-InstallStatus `
-                -Stage "elevation" `
-                -Status "running" `
-                -Message "Relaunching script as administrator" `
-                -CurrentStep "Elevation"
-
-            Ensure-LocalScript
-
-            Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
-                -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$LocalScriptPath`" -AutoRun" `
-                -Verb RunAs
-
-            Stop-Logging
-            return
-        }
+$bootstrapCommand = @"
+`$ScriptUrl = '$ScriptUrl'
+`$BaseDir = 'C:\ProgramData\ArjoTools'
+`$LocalScriptPath = Join-Path `$BaseDir 'lenovo-updates.ps1'
+New-Item -ItemType Directory -Path `$BaseDir -Force | Out-Null
+Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -ErrorAction Stop
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File `$LocalScriptPath -AutoRun
+"@
+    $encodedCommand = [Convert]::ToBase64String(
+        [Text.Encoding]::Unicode.GetBytes($bootstrapCommand)
+    )
+    Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encodedCommand" `
+        -Verb RunAs
+    Stop-Logging
+    return
+}
 
         Remove-Item -LiteralPath $CompletedFile -Force -ErrorAction SilentlyContinue
 
@@ -560,24 +567,17 @@ function Start-LenovoUpdates {
                 -Extra @{
                     Round = $Round
                 }
-
                 $updates = @()
-                $verboseOutput = Get-LSUpdate -Verbose 4>&1
-
-                $updates = @(
-                    $verboseOutput | Where-Object {
-                        $_ -isnot [System.Management.Automation.VerboseRecord]
-                    }
-                )
-
+                $updates = @(Get-LSUpdate -Verbose 4>&1 | Tee-Object -Variable rawOutput | Where-Object {
+                    $_ -isnot [System.Management.Automation.VerboseRecord]
+                })
                 $verboseLines = @(
-                    $verboseOutput | Where-Object {
+                    $rawOutput | Where-Object {
                         $_ -is [System.Management.Automation.VerboseRecord]
                     } | ForEach-Object {
                         $_.Message
                     }
                 )
-
                 Send-UdpLines -Lines $verboseLines -Level "INFO"
                 Log -Level INFO -Message "$($updates.Count) update(s) found."
 
