@@ -5,6 +5,11 @@
 $StatusApiUrl = "https://arjo-metrics.k14net.org/install-status"
 $repo = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components"
 
+$UdpLogHost = "arjo-metrics.k14net.org"
+$UdpLogPort = 9999
+
+$script:UdpClient = $null
+
 function Log {
     param (
         [Parameter(Mandatory)]
@@ -13,6 +18,8 @@ function Log {
         [Parameter(Mandatory)]
         [string]$Message
     )
+
+    Send-UdpLog -Message "[$Level] $Message"
 
     switch ($Level) {
         "INFO"    { $color = "Cyan";    $prefix = "[INFO]    " }
@@ -23,6 +30,34 @@ function Log {
     }
 
     Write-Host "$prefix$Message" -ForegroundColor $color
+}
+
+function Init-UdpLogger {
+    try {
+        $script:UdpClient = New-Object System.Net.Sockets.UdpClient
+        $script:UdpClient.Connect($UdpLogHost, $UdpLogPort)
+    } catch {
+        # silent — UDP logging is best-effort
+    }
+}
+
+function Send-UdpLog {
+    param([string]$Message)
+    try {
+        if (-not $script:UdpClient) { return }
+        $line = "$($env:COMPUTERNAME) | $(Get-Date -Format 'HH:mm:ss') | $Message"
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
+        $script:UdpClient.Send($bytes, $bytes.Length) | Out-Null
+    } catch {}
+}
+
+function Close-UdpLogger {
+    try {
+        if ($script:UdpClient) {
+            $script:UdpClient.Close()
+            $script:UdpClient = $null
+        }
+    } catch {}
 }
 
 function Get-SerialNumber {
@@ -109,6 +144,8 @@ function Invoke-PipelineScript {
     }
 }
 
+Init-UdpLogger
+
 Write-Host ""
 Write-Host "=======================================" -ForegroundColor Cyan
 Write-Host "     arjo-tools  |  Install26 Setup    " -ForegroundColor Cyan
@@ -168,3 +205,5 @@ foreach ($step in $steps) {
 }
 
 Log -Level SUCCESS -Message "Pipeline completed. Lenovo task may continue after reboot."
+
+Close-UdpLogger
