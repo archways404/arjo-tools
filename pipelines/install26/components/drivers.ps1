@@ -497,7 +497,6 @@ LogFile: $script:LogFile
 
 function Start-LenovoUpdates {
     Ensure-Folders
-
     Init-UdpLogger
 
     $script:LogFile = Join-Path $LogDir "lsuclient_$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
@@ -512,13 +511,7 @@ function Start-LenovoUpdates {
     Log -Level INFO -Message "Computer: $env:COMPUTERNAME"
     Log -Level INFO -Message "User context: $([Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 
-    # Important: acquire the lock before sending startup status.
-    # This avoids duplicate elevated windows both reporting "running".
     Start-SingleInstanceLock
-
-    # After reboot, network/services may not be ready yet.
-
-    # Wait here before trying to report status or scan Lenovo updates.
 
     Wait-ForNetwork -TimeoutSeconds 300 -RetrySeconds 10 | Out-Null
 
@@ -531,31 +524,38 @@ function Start-LenovoUpdates {
     Flush-StatusQueue
 
     try {
-    if (-not (Test-IsAdmin)) {
-        Log -Level WARN -Message "Not running elevated. Relaunching as admin..."
-        Send-InstallStatus `
-          -Stage "elevation" `
-          -Status "running" `
-          -Message "Relaunching script as administrator" `
-          -CurrentStep "Elevation"
+        if (-not (Test-IsAdmin)) {
+            Log -Level WARN -Message "Not running elevated. Relaunching as admin..."
+
+            Send-InstallStatus `
+                -Stage "elevation" `
+                -Status "running" `
+                -Message "Relaunching script as administrator" `
+                -CurrentStep "Elevation"
 
 $bootstrapCommand = @"
 `$ScriptUrl = '$ScriptUrl'
 `$BaseDir = 'C:\ProgramData\ArjoTools'
 `$LocalScriptPath = Join-Path `$BaseDir 'lenovo-updates.ps1'
+
 New-Item -ItemType Directory -Path `$BaseDir -Force | Out-Null
+
 Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -ErrorAction Stop
+
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File `$LocalScriptPath -AutoRun
 "@
-    $encodedCommand = [Convert]::ToBase64String(
-        [Text.Encoding]::Unicode.GetBytes($bootstrapCommand)
-    )
-    Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
-        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encodedCommand" `
-        -Verb RunAs
-    Stop-Logging
-    return
-}
+
+            $encodedCommand = [Convert]::ToBase64String(
+                [Text.Encoding]::Unicode.GetBytes($bootstrapCommand)
+            )
+
+            Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+                -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encodedCommand" `
+                -Verb RunAs
+
+            Stop-Logging
+            return
+        }
 
         Remove-Item -LiteralPath $CompletedFile -Force -ErrorAction SilentlyContinue
 
@@ -575,18 +575,35 @@ Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -
                 -CurrentStep "Get-LSUpdate" `
                 -CompletedSteps ($Round - 1) `
                 -TotalSteps $MaxRounds `
-                -Extra @{
-                    Round = $Round
-                }
-                $rawOutput = Invoke-LoggedCommand {
-                    Get-LSUpdate -Verbose
-                } "INFO"
-                $updates = @(
-                    $rawOutput | Where-Object {
-                        $_ -isnot [System.Management.Automation.VerboseRecord]
+                -Extra @{ Round = $Round }
+
+            $updatesList = New-Object System.Collections.ArrayList
+
+            try {
+                Get-LSUpdate -Verbose 4>&1 | ForEach-Object {
+                    $item = $_
+
+                    if ($item -is [System.Management.Automation.VerboseRecord]) {
+                        Send-UdpLog -Message "[INFO] $($item.Message)"
+                        Write-Host $item.Message
+                        return
                     }
-                )
-                Log -Level INFO -Message "$($updates.Count) update(s) found."
+
+                    if ($null -ne $item -and $item.PSObject.Properties["Title"]) {
+                        [void]$updatesList.Add($item)
+                    }
+                }
+            } catch {
+                if ($_.Exception.Message -like "*Argument types do not match*") {
+                    Log -Level WARN -Message "LSUClient threw 'Argument types do not match' after scan. Continuing with collected updates."
+                } else {
+                    throw
+                }
+            }
+
+            $updates = @($updatesList.ToArray())
+
+            Log -Level INFO -Message "$($updates.Count) update(s) found."
 
             if ($updates.Count -eq 0) {
                 Complete-Run
@@ -623,7 +640,7 @@ Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -
                     }
 
                 try {
-                  Invoke-LoggedCommand { $update | Save-LSUpdate -Verbose } "INFO" | Out-Null
+                    Invoke-LoggedCommand { $update | Save-LSUpdate -Verbose } "INFO" | Out-Null
 
                     Send-InstallStatus `
                         -Stage "lenovo-download" `
@@ -639,19 +656,6 @@ Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -
                         }
                 } catch {
                     Log -Level ERROR -Message "Failed downloading $($update.Title): $($_.Exception.Message)"
-
-                    Send-InstallStatus `
-                        -Stage "lenovo-download" `
-                        -Status "failed" `
-                        -Message "Failed downloading Lenovo update $d of $($updates.Count): $($update.Title)" `
-                        -CurrentStep $update.Title `
-                        -CompletedSteps ($d - 1) `
-                        -TotalSteps $updates.Count `
-                        -Extra @{
-                            Round = $Round
-                            UpdateTitle = $update.Title
-                            Error = $_.Exception.Message
-                        }
                 }
 
                 $d++
@@ -679,43 +683,16 @@ Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -
                     }
 
                 try {
-                  Invoke-LoggedCommand {
-                      Install-LSUpdate `
+                    Invoke-LoggedCommand {
+                        Install-LSUpdate `
                             -Package $update `
                             -Verbose `
                             -SaveBIOSUpdateInfoToRegistry
-                  } "INFO" | Out-Null
-
-                    Send-InstallStatus `
-                        -Stage "lenovo-install" `
-                        -Status "running" `
-                        -Message "Installed Lenovo update $i of $($updates.Count): $($update.Title)" `
-                        -CurrentStep $update.Title `
-                        -CompletedSteps $i `
-                        -TotalSteps $updates.Count `
-                        -Extra @{
-                            Round = $Round
-                            UpdateTitle = $update.Title
-                            InstallIndex = $i
-                        }
+                    } "INFO" | Out-Null
 
                     Log -Level SUCCESS -Message "Installed: $($update.Title)"
                 } catch {
                     Log -Level ERROR -Message "Failed installing $($update.Title): $($_.Exception.Message)"
-
-                    Send-InstallStatus `
-                        -Stage "lenovo-install" `
-                        -Status "failed" `
-                        -Message "Failed installing Lenovo update $i of $($updates.Count): $($update.Title)" `
-                        -CurrentStep $update.Title `
-                        -CompletedSteps ($i - 1) `
-                        -TotalSteps $updates.Count `
-                        -Extra @{
-                            Round = $Round
-                            Error = $_.Exception.Message
-                            UpdateTitle = $update.Title
-                            InstallIndex = $i
-                        }
                 }
 
                 $i++
@@ -742,8 +719,6 @@ Invoke-WebRequest -Uri `$ScriptUrl -OutFile `$LocalScriptPath -UseBasicParsing -
                 Restart-Computer -Force
                 return
             }
-
-            Log -Level INFO -Message "No pending reboot detected after round $Round."
         }
 
         Log -Level WARN -Message "Max rounds reached. Re-checking update state."
