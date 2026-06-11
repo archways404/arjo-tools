@@ -561,10 +561,24 @@ function Start-LenovoUpdates {
                     Round = $Round
                 }
 
-                $verboseOutput = & {
-                    $updates = @(Get-LSUpdate -Verbose)
-                } 4>&1
-                Send-UdpLines -Lines ($verboseOutput | ForEach-Object { $_.ToString() }) -Level "INFO"
+                $updates = @()
+                $verboseOutput = Get-LSUpdate -Verbose 4>&1
+
+                $updates = @(
+                    $verboseOutput | Where-Object {
+                        $_ -isnot [System.Management.Automation.VerboseRecord]
+                    }
+                )
+
+                $verboseLines = @(
+                    $verboseOutput | Where-Object {
+                        $_ -is [System.Management.Automation.VerboseRecord]
+                    } | ForEach-Object {
+                        $_.Message
+                    }
+                )
+
+                Send-UdpLines -Lines $verboseLines -Level "INFO"
                 Log -Level INFO -Message "$($updates.Count) update(s) found."
 
             if ($updates.Count -eq 0) {
