@@ -20,31 +20,19 @@
 <p align="center">
 
   <img
-
-    src="./assets/ignition-dash.png"
-
-    alt="Ignition Dashboard"
-
-    width="900"
-
+   src="./assets/ignition-dash.png"
+   alt="Ignition Dashboard"
+   width="900"
   />
-
 </p>
 
 <p align="center">
-
   <em>Live deployment monitoring dashboard showing pipeline progress, status reporting and real-time console output.</em><br>
-
   🎥 <a href="https://www.youtube.com/watch?v=20pHPQ4U-e4">Video Demo</a>
-
 </p>
-
 <p align="center">
-
   <strong>NL2026 Deployment</strong><br>
-
   ~126 Devices • Automated Provisioning • Real-Time Monitoring
-
 </p>
 
 ### What it does
