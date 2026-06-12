@@ -23,7 +23,7 @@ param(
 # URLs & Ports
 # ----------------------------------------------------------------------
 $ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/drivers.ps1"
-$RemovalScriptUrl = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/removal.ps1"
+$CleanScriptUrl = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/cleanup.ps1"
 $StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
 $UdpLogHost = "arjo-metrics.k14net.org"
 $UdpLogPort = 9999
@@ -503,7 +503,7 @@ LogFile: $script:LogFile
         -CurrentStep "removal.ps1"
 
     try {
-        $removalContent = (Invoke-WebRequest $RemovalScriptUrl -UseBasicParsing -ErrorAction Stop).Content
+        $removalContent = (Invoke-WebRequest $CleanScriptUrl -UseBasicParsing -ErrorAction Stop).Content
 
         if ($removalContent.Length -gt 0 -and [int][char]$removalContent[0] -eq 0xFEFF) {
             $removalContent = $removalContent.Substring(1)
