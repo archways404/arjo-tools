@@ -11,6 +11,7 @@
 # - Prevents duplicate instances with a global mutex lock
 # - Reboots after each install batch, then resumes
 # - Removes scheduled task when no updates remain
+# - Runs full removal of ArjoTools folder on clean completion
 # ==============================================================================
 
 param(
@@ -22,6 +23,7 @@ param(
 # URLs & Ports
 # ----------------------------------------------------------------------
 $ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/drivers.ps1"
+$RemovalScriptUrl = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/removal.ps1"
 $StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
 $UdpLogHost = "arjo-metrics.k14net.org"
 $UdpLogPort = 9999
@@ -280,7 +282,6 @@ function Send-InstallStatus {
         Extra          = $Extra
     } | ConvertTo-Json -Depth 10 -Compress
 
-    # Try to send old queued messages before sending the new one.
     Flush-StatusQueue
 
     try {
@@ -399,14 +400,14 @@ function Register-ResumeTask {
         -LogonType ServiceAccount `
         -RunLevel Highest
 
-        $settings = New-ScheduledTaskSettingsSet `
-            -AllowStartIfOnBatteries `
-            -DontStopIfGoingOnBatteries `
-            -StartWhenAvailable `
-            -MultipleInstances IgnoreNew `
-            -RestartCount 5 `
-            -RestartInterval (New-TimeSpan -Minutes 5) `
-            -ExecutionTimeLimit (New-TimeSpan -Hours 3)
+    $settings = New-ScheduledTaskSettingsSet `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable `
+        -MultipleInstances IgnoreNew `
+        -RestartCount 5 `
+        -RestartInterval (New-TimeSpan -Minutes 5) `
+        -ExecutionTimeLimit (New-TimeSpan -Hours 3)
 
     Register-ScheduledTask `
         -TaskName $TaskName `
@@ -418,7 +419,6 @@ function Register-ResumeTask {
 
     $createdTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
     Log -Level SUCCESS -Message "Resume task registered. State: $($createdTask.State)"
-
 }
 
 function Remove-ResumeTask {
@@ -492,7 +492,48 @@ LogFile: $script:LogFile
 
     Log -Level SUCCESS -Message "Completion marker written to: $CompletedFile"
     Log -Level SUCCESS -Message "Finished completely."
-    Stop-Logging
+
+    # Full removal of ArjoTools folder — runs after everything is done
+    Log -Level INFO -Message "Running full removal of ArjoTools folder..."
+
+    Send-InstallStatus `
+        -Stage "removal" `
+        -Status "running" `
+        -Message "Running full ArjoTools folder removal" `
+        -CurrentStep "removal.ps1"
+
+    try {
+        $removalContent = (Invoke-WebRequest $RemovalScriptUrl -UseBasicParsing -ErrorAction Stop).Content
+
+        if ($removalContent.Length -gt 0 -and [int][char]$removalContent[0] -eq 0xFEFF) {
+            $removalContent = $removalContent.Substring(1)
+        }
+
+        if ($removalContent.StartsWith("ï»¿")) {
+            $removalContent = $removalContent.Substring(3)
+        }
+
+        # Send final status before the folder (and this log) gets wiped
+        Send-InstallStatus `
+            -Stage "removal" `
+            -Status "completed" `
+            -Message "Removal completed — ArjoTools folder wiped" `
+            -CurrentStep "removal.ps1"
+
+        Stop-Logging
+        iex $removalContent
+    } catch {
+        Log -Level WARN -Message "Removal script failed: $($_.Exception.Message)"
+
+        Send-InstallStatus `
+            -Stage "removal" `
+            -Status "failed" `
+            -Message "Removal script failed: $($_.Exception.Message)" `
+            -CurrentStep "removal.ps1" `
+            -Extra @{ Error = $_.Exception.Message }
+
+        Stop-Logging
+    }
 }
 
 function Start-LenovoUpdates {

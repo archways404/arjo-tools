@@ -194,6 +194,7 @@ $steps = @(
 
 $total = $steps.Count
 $current = 0
+$pipelineError = $null
 
 foreach ($step in $steps) {
     $current++
@@ -210,20 +211,20 @@ foreach ($step in $steps) {
         -CompletedSteps ($current - 1) `
         -TotalSteps $total
 
-        try {
-            Invoke-PipelineScript -Url $step.Url -EntryPoint $step.EntryPoint
-            if ($step.Stage -ne "lenovo") {
-                Send-PipelineStatus `
-                    -Stage $step.Stage `
-                    -Status "completed" `
-                    -Message "Completed $($step.Label)" `
-                    -CurrentStep $step.Label `
-                    -CompletedSteps $current `
-                    -TotalSteps $total
-            } else {
-                Log -Level INFO -Message "Lenovo status is handled by drivers.ps1. Skipping pipeline completion overwrite."
-            }
-        } catch {
+    try {
+        Invoke-PipelineScript -Url $step.Url -EntryPoint $step.EntryPoint
+        if ($step.Stage -ne "lenovo") {
+            Send-PipelineStatus `
+                -Stage $step.Stage `
+                -Status "completed" `
+                -Message "Completed $($step.Label)" `
+                -CurrentStep $step.Label `
+                -CompletedSteps $current `
+                -TotalSteps $total
+        } else {
+            Log -Level INFO -Message "Lenovo status is handled by drivers.ps1. Skipping pipeline completion overwrite."
+        }
+    } catch {
         Send-PipelineStatus `
             -Stage $step.Stage `
             -Status "failed" `
@@ -233,8 +234,43 @@ foreach ($step in $steps) {
             -TotalSteps $total `
             -Extra @{ Error = $_.Exception.Message }
 
-        throw
+        $pipelineError = $_
+        break
     }
+}
+
+if ($pipelineError) {
+    Log -Level ERROR -Message "Pipeline failed: $($pipelineError.Exception.Message)"
+    Log -Level INFO -Message "Running cleanup (script-only removal)..."
+
+    Send-PipelineStatus `
+        -Stage "cleanup" `
+        -Status "running" `
+        -Message "Pipeline failed — running script cleanup" `
+        -CurrentStep "cleanup.ps1" `
+        -Extra @{ Error = $pipelineError.Exception.Message }
+
+    try {
+        Invoke-PipelineScript -Url "$repo/cleanup.ps1" -EntryPoint ""
+
+        Send-PipelineStatus `
+            -Stage "cleanup" `
+            -Status "completed" `
+            -Message "Cleanup completed" `
+            -CurrentStep "cleanup.ps1"
+    } catch {
+        Log -Level WARN -Message "Cleanup script failed: $($_.Exception.Message)"
+
+        Send-PipelineStatus `
+            -Stage "cleanup" `
+            -Status "failed" `
+            -Message "Cleanup script failed: $($_.Exception.Message)" `
+            -CurrentStep "cleanup.ps1" `
+            -Extra @{ Error = $_.Exception.Message }
+    }
+
+    Close-UdpLogger
+    exit 1
 }
 
 Log -Level SUCCESS -Message "Pipeline completed. Lenovo task may continue after reboot."
