@@ -11,7 +11,6 @@
 # - Prevents duplicate instances with a global mutex lock
 # - Reboots after each install batch, then resumes
 # - Removes scheduled task when no updates remain
-# - Runs full removal of ArjoTools folder on clean completion
 # ==============================================================================
 
 param(
@@ -22,30 +21,28 @@ param(
 # ----------------------------------------------------------------------
 # URLs & Ports
 # ----------------------------------------------------------------------
-$ScriptUrl        = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/drivers.ps1"
-$CleanScriptUrl = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/cleanup.ps1"
-$StatusApiUrl     = "https://arjo-metrics.k14net.org/install-status"
-$UdpLogHost = "arjo-metrics.k14net.org"
-$UdpLogPort = 9999
+$ScriptUrl    = "https://raw.githubusercontent.com/archways404/arjo-tools/master/pipelines/install26/components/drivers.ps1"
+$StatusApiUrl = "https://arjo-metrics.k14net.org/install-status"
+$UdpLogHost   = "arjo-metrics.k14net.org"
+$UdpLogPort   = 9999
 $script:UdpClient = $null
 
 # ----------------------------------------------------------------------
 # Local paths
 # ----------------------------------------------------------------------
-$BaseDir          = "C:\ProgramData\ArjoTools"
-$LocalScriptPath  = Join-Path $BaseDir "lenovo-updates.ps1"
-$LogDir           = Join-Path $BaseDir "Logs"
-$TaskName         = "Ignition LenovoDriverUpdate"
-$CompletedFile    = Join-Path $BaseDir "LenovoUpdatesCompleted.txt"
-$StatusQueueFile  = Join-Path $BaseDir "install-status-queue.jsonl"
+$BaseDir         = "C:\ProgramData\ArjoTools"
+$LocalScriptPath = Join-Path $BaseDir "lenovo-updates.ps1"
+$LogDir          = Join-Path $BaseDir "Logs"
+$TaskName        = "Ignition LenovoDriverUpdate"
+$CompletedFile   = Join-Path $BaseDir "LenovoUpdatesCompleted.txt"
+$StatusQueueFile = Join-Path $BaseDir "install-status-queue.jsonl"
 
 # ----------------------------------------------------------------------
 # Single-instance lock
-# Prevents two elevated windows / scheduled task instances from running together.
 # ----------------------------------------------------------------------
-$MutexName        = "Global\ArjoLenovoUpdatesMutex"
-$script:Mutex     = $null
-$script:LogFile   = $null
+$MutexName    = "Global\ArjoLenovoUpdatesMutex"
+$script:Mutex = $null
+$script:LogFile = $null
 
 function Ensure-Folders {
     New-Item -ItemType Directory -Path $BaseDir -Force | Out-Null
@@ -54,8 +51,7 @@ function Ensure-Folders {
 
 function Send-UdpLines {
     param(
-        [Parameter(Mandatory)]
-        [string[]]$Lines,
+        [Parameter(Mandatory)][string[]]$Lines,
         [string]$Level = "INFO"
     )
     foreach ($line in $Lines) {
@@ -66,8 +62,7 @@ function Send-UdpLines {
 
 function Invoke-LoggedCommand {
     param(
-        [Parameter(Mandatory)]
-        [scriptblock]$Script,
+        [Parameter(Mandatory)][scriptblock]$Script,
         [string]$Level = "INFO"
     )
 
@@ -76,7 +71,6 @@ function Invoke-LoggedCommand {
     try {
         & $Script 4>&1 | ForEach-Object {
             $item = $_
-
             [void]$items.Add([object]$item)
 
             if ($item -is [System.Management.Automation.VerboseRecord]) {
@@ -111,13 +105,7 @@ function Log {
         Add-Content -LiteralPath $script:LogFile -Value $line -ErrorAction SilentlyContinue
     }
 
-    $map = @{
-        INFO    = "Cyan"
-        SUCCESS = "Green"
-        WARN    = "Yellow"
-        ERROR   = "Red"
-        HEADER  = "Magenta"
-    }
+    $map = @{ INFO = "Cyan"; SUCCESS = "Green"; WARN = "Yellow"; ERROR = "Red"; HEADER = "Magenta" }
 
     if ($Level -eq "HEADER") {
         Write-Host "`n==== $Message ====" -ForegroundColor $map[$Level]
@@ -130,9 +118,7 @@ function Init-UdpLogger {
     try {
         $script:UdpClient = New-Object System.Net.Sockets.UdpClient
         $script:UdpClient.Connect($UdpLogHost, $UdpLogPort)
-    } catch {
-        # silent — UDP logging is best-effort
-    }
+    } catch {}
 }
 
 function Send-UdpLog {
@@ -161,7 +147,6 @@ function Wait-ForNetwork {
     )
 
     Log -Level INFO -Message "Waiting for network/API availability..."
-
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 
     while ((Get-Date) -lt $deadline) {
@@ -169,7 +154,6 @@ function Wait-ForNetwork {
             Log -Level SUCCESS -Message "Network/API is available."
             return $true
         }
-
         Log -Level WARN -Message "Network/API not ready yet. Retrying in $RetrySeconds seconds..."
         Start-Sleep -Seconds $RetrySeconds
     }
@@ -179,22 +163,13 @@ function Wait-ForNetwork {
 }
 
 function Get-SerialNumber {
-    try {
-        return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber
-    } catch {
-        return $null
-    }
+    try { return (Get-CimInstance Win32_BIOS -ErrorAction Stop).SerialNumber }
+    catch { return $null }
 }
 
 function Test-StatusApiAvailable {
     try {
-        Invoke-WebRequest `
-            -Uri $StatusApiUrl `
-            -Method GET `
-            -UseBasicParsing `
-            -TimeoutSec 5 `
-            -ErrorAction Stop | Out-Null
-
+        Invoke-WebRequest -Uri $StatusApiUrl -Method GET -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop | Out-Null
         return $true
     } catch {
         return $false
@@ -203,7 +178,6 @@ function Test-StatusApiAvailable {
 
 function Add-StatusToQueue {
     param([string]$JsonBody)
-
     try {
         Ensure-Folders
         Add-Content -LiteralPath $StatusQueueFile -Value $JsonBody -ErrorAction SilentlyContinue
@@ -211,13 +185,8 @@ function Add-StatusToQueue {
 }
 
 function Flush-StatusQueue {
-    if (-not (Test-Path $StatusQueueFile)) {
-        return
-    }
-
-    if (-not (Test-StatusApiAvailable)) {
-        return
-    }
+    if (-not (Test-Path $StatusQueueFile)) { return }
+    if (-not (Test-StatusApiAvailable)) { return }
 
     try {
         $queued = Get-Content -LiteralPath $StatusQueueFile -ErrorAction Stop
@@ -230,18 +199,9 @@ function Flush-StatusQueue {
         $remaining = New-Object System.Collections.Generic.List[string]
 
         foreach ($line in $queued) {
-            if ([string]::IsNullOrWhiteSpace($line)) {
-                continue
-            }
-
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
             try {
-                Invoke-RestMethod `
-                    -Uri $StatusApiUrl `
-                    -Method POST `
-                    -Body $line `
-                    -ContentType "application/json" `
-                    -TimeoutSec 10 `
-                    -ErrorAction Stop | Out-Null
+                Invoke-RestMethod -Uri $StatusApiUrl -Method POST -Body $line -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop | Out-Null
             } catch {
                 $remaining.Add($line)
             }
@@ -285,13 +245,7 @@ function Send-InstallStatus {
     Flush-StatusQueue
 
     try {
-        Invoke-RestMethod `
-            -Uri $StatusApiUrl `
-            -Method POST `
-            -Body $body `
-            -ContentType "application/json" `
-            -TimeoutSec 10 `
-            -ErrorAction Stop | Out-Null
+        Invoke-RestMethod -Uri $StatusApiUrl -Method POST -Body $body -ContentType "application/json" -TimeoutSec 10 -ErrorAction Stop | Out-Null
     } catch {
         Add-StatusToQueue -JsonBody $body
         Log -Level WARN -Message "Failed sending install status. Queued locally: $($_.Exception.Message)"
@@ -336,10 +290,7 @@ function Test-IsSystem {
 }
 
 function Test-IsAdmin {
-    if (Test-IsSystem) {
-        return $true
-    }
-
+    if (Test-IsSystem) { return $true }
     return ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
         [Security.Principal.WindowsBuiltInRole]::Administrator
     )
@@ -355,9 +306,7 @@ function Test-PendingReboot {
             -Name PendingFileRenameOperations `
             -ErrorAction SilentlyContinue
 
-        if ($pending.PendingFileRenameOperations) {
-            return $true
-        }
+        if ($pending.PendingFileRenameOperations) { return $true }
     } catch {}
 
     return $false
@@ -365,7 +314,6 @@ function Test-PendingReboot {
 
 function Ensure-LocalScript {
     Ensure-Folders
-
     Log -Level INFO -Message "Downloading latest script to: $LocalScriptPath"
 
     Send-InstallStatus `
@@ -375,7 +323,6 @@ function Ensure-LocalScript {
         -CurrentStep "Ensure-LocalScript"
 
     Invoke-WebRequest -Uri $ScriptUrl -OutFile $LocalScriptPath -UseBasicParsing -ErrorAction Stop
-
     Log -Level SUCCESS -Message "Local script updated."
 }
 
@@ -423,7 +370,6 @@ function Register-ResumeTask {
 
 function Remove-ResumeTask {
     $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-
     if ($task) {
         Log -Level INFO -Message "Removing scheduled task: $TaskName"
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
@@ -493,47 +439,7 @@ LogFile: $script:LogFile
     Log -Level SUCCESS -Message "Completion marker written to: $CompletedFile"
     Log -Level SUCCESS -Message "Finished completely."
 
-    # Full removal of ArjoTools folder — runs after everything is done
-    Log -Level INFO -Message "Running full removal of ArjoTools folder..."
-
-    Send-InstallStatus `
-        -Stage "removal" `
-        -Status "running" `
-        -Message "Running full ArjoTools folder removal" `
-        -CurrentStep "removal.ps1"
-
-    try {
-        $removalContent = (Invoke-WebRequest $CleanScriptUrl -UseBasicParsing -ErrorAction Stop).Content
-
-        if ($removalContent.Length -gt 0 -and [int][char]$removalContent[0] -eq 0xFEFF) {
-            $removalContent = $removalContent.Substring(1)
-        }
-
-        if ($removalContent.StartsWith("ï»¿")) {
-            $removalContent = $removalContent.Substring(3)
-        }
-
-        # Send final status before the folder (and this log) gets wiped
-        Send-InstallStatus `
-            -Stage "removal" `
-            -Status "completed" `
-            -Message "Removal completed — ArjoTools folder wiped" `
-            -CurrentStep "removal.ps1"
-
-        Stop-Logging
-        iex $removalContent
-    } catch {
-        Log -Level WARN -Message "Removal script failed: $($_.Exception.Message)"
-
-        Send-InstallStatus `
-            -Stage "removal" `
-            -Status "failed" `
-            -Message "Removal script failed: $($_.Exception.Message)" `
-            -CurrentStep "removal.ps1" `
-            -Extra @{ Error = $_.Exception.Message }
-
-        Stop-Logging
-    }
+    Stop-Logging
 }
 
 function Start-LenovoUpdates {
