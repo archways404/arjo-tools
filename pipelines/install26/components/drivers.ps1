@@ -35,7 +35,7 @@ $script:UdpClient = $null
 $BaseDir          = "C:\ProgramData\ArjoTools"
 $LocalScriptPath  = Join-Path $BaseDir "lenovo-updates.ps1"
 $LogDir           = Join-Path $BaseDir "Logs"
-$TaskName         = "Arjo Lenovo Updates Resume"
+$TaskName         = "Ignition LenovoDriverUpdate"
 $CompletedFile    = Join-Path $BaseDir "LenovoUpdatesCompleted.txt"
 $StatusQueueFile  = Join-Path $BaseDir "install-status-queue.jsonl"
 
