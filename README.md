@@ -17,7 +17,35 @@
 
 **Ignition** is an automated laptop provisioning pipeline built for ARJO device deployments. It takes a factory-fresh machine and brings it to a fully configured, update-ready state in one command — minimal manual intervention and remote visibility throughout the process.
 
-Currently powering the **NL2026 deployment** (NLTIE site, ~126 devices), with the goal of expanding to all ARJO sites.
+<p align="center">
+
+  <img
+
+    src="./assets/ignition-dash.png"
+
+    alt="Ignition Dashboard"
+
+    width="900"
+
+  />
+
+</p>
+
+<p align="center">
+
+  <em>Live deployment monitoring dashboard showing pipeline progress, status reporting and real-time console output.</em><br>
+
+  🎥 <a href="https://www.youtube.com/watch?v=20pHPQ4U-e4">Video Demo</a>
+
+</p>
+
+<p align="center">
+
+  <strong>NL2026 Deployment</strong><br>
+
+  ~126 Devices • Automated Provisioning • Real-Time Monitoring
+
+</p>
 
 ### What it does
 
@@ -55,7 +83,7 @@ That's it. The pipeline starts immediately and handles everything from there.
 
 ---
 
-### Step 2 — auto-swc
+## ⚙️ auto-swc
 
 Once Ignition has finished and the machine is fully updated, **auto-swc** handles the SoftwareCentral and device management configuration. This is a separate Playwright-based Node.js automation tool that runs after Ignition and takes care of everything that requires interacting with external systems on behalf of the device.
 
