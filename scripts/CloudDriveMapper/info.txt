@@ -1,0 +1,22 @@
+Save as: C:\Scripts\Map_L_Drive.ps1
+
+Task Scheduler setup:
+
+Trigger:
+"At log on" (not "At startup")
+— since R: depends on the user session existing (CDM/OneDrive needs to initialize post-login).
+
+Action:
+Start a program
+
+Program/script:
+powershell.exe
+
+Add arguments:
+-ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Scripts\Map_L_Drive.ps1"
+
+General tab:
+"Run only when user is logged on" (subst is session-scoped, so this must run in the interactive user session, not as a background/system service).
+
+Conditions/Settings:
+Timeout 10min
