@@ -95,7 +95,7 @@ $menuItems = @(
     },
     @{
         Label       = "Deploy CDM L-Drive Mapper (AutoCAD)"
-        Description = "Sets up L: subst mapping + scheduled task for CDM V3 AutoCAD exception users"
+        Description = "Sets up L: subst mapping & scheduled task for the script"
         Url         = "$repo/components/CloudDriveMapperCAD.ps1"
         EntryPoint  = "Install-CloudDriveMapperCAD"
     }
