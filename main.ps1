@@ -92,6 +92,12 @@ $menuItems = @(
             Description = "Looks up M365 license and recommends Office install type"
             Url         = "$repo/components/mslic.ps1"
             EntryPoint  = "Get-UserLicense"
+    },
+    @{
+        Label       = "Deploy CDM L-Drive Mapper (AutoCAD)"
+        Description = "Sets up L: subst mapping + scheduled task for CDM V3 AutoCAD exception users"
+        Url         = "$repo/components/CloudDriveMapperCAD.ps1"
+        EntryPoint  = "Install-CloudDriveMapperCAD"
     }
 )
 
