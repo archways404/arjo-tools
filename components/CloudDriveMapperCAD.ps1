@@ -95,6 +95,11 @@ function Install-CloudDriveMapperCAD {
             $xmlContent = $xmlContent.Substring(3)
         }
 
+        # Replace placeholder with the current logged-in user (DOMAIN\username)
+        $currentUser = "$env:USERDOMAIN\$env:USERNAME"
+        Log -Level INFO -Message "Injecting current user into task XML: $currentUser"
+        $xmlContent = $xmlContent -replace "%%CURRENTUSER%%", [System.Security.SecurityElement]::Escape($currentUser)
+
         Set-Content -LiteralPath $xmlPath -Value $xmlContent -Encoding Unicode -ErrorAction Stop
         Log -Level SUCCESS -Message "Saved task definition to $xmlPath"
     } catch {
