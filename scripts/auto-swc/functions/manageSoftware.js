@@ -105,6 +105,6 @@ export async function installSoftware(page, { dryRun = false } = {}) {
     "#ctl00_ContentPlaceHolderMain_RadButtonCommit_input",
   );
   await page.click("#ctl00_ContentPlaceHolderMain_RadButtonCommit_input");
-  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(10000);
   console.log("[ACTION] Install triggered");
 }
