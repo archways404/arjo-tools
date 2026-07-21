@@ -25,6 +25,8 @@ export async function searchPCEditComputer(page, pcName) {
     { delay: 100 },
   );
 
+  await page.waitForTimeout(2000);
+
   const item = await page.waitForSelector("li.rcbHovered", { timeout: 15000 });
   const text = await item.textContent();
   if (!text.includes(pcName)) throw new Error(`Unexpected match: ${text}`);
@@ -46,8 +48,11 @@ export async function selectTemplate(page, templateName) {
 
   await page.waitForSelector("ul.rcbList", { timeout: 15000 });
   await page.locator("ul.rcbList li").filter({ hasText: templateName }).click();
+  await page.waitForTimeout(2000);
 
   console.log(`[ACTION] Selected template: ${templateName}`);
+
+
 }
 
 export async function applyChanges(page, { dryRun = false } = {}) {
@@ -56,11 +61,12 @@ export async function applyChanges(page, { dryRun = false } = {}) {
     return;
   }
   console.log("[ACTION] Applying changes");
+  await page.waitForTimeout(2000);
   await page.waitForSelector(
     "#ctl00_ContentPlaceHolderMain_RadButtonApply_input",
   );
   await page.waitForTimeout(1000);
   await page.click("#ctl00_ContentPlaceHolderMain_RadButtonApply_input");
-  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(10000);
   console.log("[ACTION] Changes applied");
 }
