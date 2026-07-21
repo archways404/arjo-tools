@@ -76,10 +76,10 @@ async function run(page, entry) {
   await withRetry("clickRole", () => clickRole(page, "NLTIE"));
 
   // EDIT COMPUTER
-  // await withRetry("openEditComputer",      () => openEditComputer(page));
-  // await withRetry("searchPCEditComputer",  () => searchPCEditComputer(page, pc));
-  // await withRetry("selectTemplate",        () => selectTemplate(page, "NLTIE (NL)"));
-  // await withRetry("applyChanges",          () => applyChanges(page, { dryRun: DRY_RUN }));
+  await withRetry("openEditComputer",      () => openEditComputer(page));
+  await withRetry("searchPCEditComputer",  () => searchPCEditComputer(page, pc));
+  await withRetry("selectTemplate",        () => selectTemplate(page, "NLTIE (NL)"));
+  await withRetry("applyChanges",          () => applyChanges(page, { dryRun: DRY_RUN }));
 
   // EDIT AD COMPUTER
   // await withRetry("openEditADComputer", () => openEditADComputer(page));

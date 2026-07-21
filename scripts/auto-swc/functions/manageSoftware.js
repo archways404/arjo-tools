@@ -50,6 +50,7 @@ export async function searchAndSelectSoftware(page, softwareName) {
   await page.keyboard.press("Delete");
   await page.waitForTimeout(500);
   await page.type(INPUT, softwareName, { delay: 100 });
+  await page.waitForTimeout(1000);
 
   // Wait for dropdown to appear
   try {

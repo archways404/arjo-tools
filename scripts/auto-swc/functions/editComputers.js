@@ -59,6 +59,7 @@ export async function applyChanges(page, { dryRun = false } = {}) {
   await page.waitForSelector(
     "#ctl00_ContentPlaceHolderMain_RadButtonApply_input",
   );
+  await page.waitForTimeout(1000);
   await page.click("#ctl00_ContentPlaceHolderMain_RadButtonApply_input");
   await page.waitForLoadState("networkidle");
   console.log("[ACTION] Changes applied");
