@@ -4,19 +4,17 @@ function Add-Printers {
         "2" = "\\SEMA3-util-p01\SEMA3-Plot-PD"
         "3" = "\\SEMA3-util-p01\DKBAL-Print Room"
         "4" = "\\SEMA3-util-p01\NOOS2-NH8"
-        "5" = "\\NLTIE-PRN-P01\SAL-MPC3002"
-        "6" = "\\NLTIE-PRN-P01\REP-MPC6501"
-        "7" = "\\NLTIE-PRN-P01\REC-MPC3502"
-        "8" = "Custom"
+        "5" = "Custom"
+        "6" = "Open NLTIE printers in Explorer (SAL/REP/REC)"
     }
 
     Log -Level HEADER -Message "Available Printers"
     foreach ($key in ($printerNames.Keys | Sort-Object {[int]$_})) {
         $label = $printerNames[$key]
-        if ($label -ne "Custom") {
-            Write-Host "$key. $label" -ForegroundColor White
-        } else {
+        if ($label -eq "Custom") {
             Write-Host "$key. Custom (manual input)" -ForegroundColor White
+        } else {
+            Write-Host "$key. $label" -ForegroundColor White
         }
     }
 
@@ -25,11 +23,26 @@ function Add-Printers {
 
     foreach ($option in $selected) {
         if ($printerNames.ContainsKey($option)) {
-            if ($printerNames[$option] -eq "Custom") {
-                $customPrinter = Read-Host "Enter full UNC path to printer (e.g. \\server\printer)"
-                Try-AddPrinter $customPrinter
-            } else {
-                Try-AddPrinter $printerNames[$option]
+            switch ($printerNames[$option]) {
+                "Custom" {
+                    $customPrinter = Read-Host "Enter full UNC path to printer (e.g. \\server\printer)"
+                    Try-AddPrinter $customPrinter
+                }
+                "Open NLTIE printers in Explorer (SAL/REP/REC)" {
+                    $nltiePrinters = @(
+                        "\\NLTIE-PRN-P01\SAL-MPC3002",
+                        "\\NLTIE-PRN-P01\REP-MPC6501",
+                        "\\NLTIE-PRN-P01\REC-MPC3502"
+                    )
+                    foreach ($path in $nltiePrinters) {
+                        Log -Level INFO -Message "Opening in Explorer: $path"
+                        Start-Process explorer.exe -ArgumentList $path
+                        Start-Sleep -Seconds 2
+                    }
+                }
+                default {
+                    Try-AddPrinter $printerNames[$option]
+                }
             }
         } else {
             Log -Level WARN -Message "Invalid selection: $option"
