@@ -13,6 +13,16 @@
  
 </div>
 
+## 📚 Documentation
+
+| Component | Docs |
+|---|---|
+| 🔥 Ignition (install26 pipeline) | [pipelines/install26/documentation.md](./pipelines/install26/documentation.md) |
+| ⚙️ auto-swc | [scripts/auto-swc/documentation.md](./scripts/auto-swc/documentation.md) |
+| 🗂️ CDM L-Drive Mapper | [scripts/CloudDriveMapper/documentation.md](./scripts/CloudDriveMapper/documentation.md) |
+
+---
+
 ## 🔥 Ignition
 
 **Ignition** is an automated laptop provisioning pipeline built for ARJO device deployments. It takes a factory-fresh machine and brings it to a fully configured, update-ready state in one command — minimal manual intervention and remote visibility throughout the process.
@@ -28,11 +38,11 @@
 
 <p align="center">
   <em>Live deployment monitoring dashboard showing pipeline progress, status reporting and real-time console output.</em><br>
-  🎥 <a href="https://www.youtube.com/watch?v=20pHPQ4U-e4">Video Demo</a>
+  🎥 <a href="https://www.youtube.com/watch?v=20pHPQ4U-e4">Video Demo</a> • 🌐 <a href="https://ignition.k14net.org/">Live Dashboard</a>
 </p>
 <p align="center">
   <strong>NL2026 Deployment</strong><br>
-  ~126 Devices • Automated Provisioning • Real-Time Monitoring
+  ~115 Devices • Automated Provisioning • Real-Time Monitoring
 </p>
 
 ### What it does
@@ -79,7 +89,7 @@ Once Ignition has finished and the machine is fully updated, **auto-swc** handle
 
 | Task | Description |
 |:----:|-------------|
-| **Device naming in LogMeIn** | Renames the device in LogMeIn to the correct ARJO naming convention |
+| **Device naming in LogMeIn** | Renames the device in LogMeIn to the correct ARJO naming convention (NOT COMPLETE)|
 | **Device naming in SWC** | Sets the device name in SoftwareCentral to match |
 | **Application install queue** | Adds the required applications to the SWC install queue for the device based on its department/role |
 | **Device template assignment** | Assigns the correct SWC device template |
@@ -89,6 +99,18 @@ Once Ignition has finished and the machine is fully updated, **auto-swc** handle
 #### How it works
 
 auto-swc is driven by a batch config file (`ini.json`) per department, so the same tool handles different device roles without any manual input per machine. You load the config for the relevant department, point it at the list of devices, and it processes the entire batch automatically.
+
+See the [auto-swc documentation](./scripts/auto-swc/documentation.md) for setup (`.env`, `ini.json` format), the dev/prod run commands, and how to extend the PC-type/software maps.
+
+---
+
+## 🗂️ CDM L-Drive Mapper
+
+Handles the **Cloud Drive Mapper V2 → V3** migration for AutoCAD users whose workflows depend on a stable `L:` drive path. It deploys `Map_L_Drive.ps1` and a scheduled-task XML directly to `C:\Scripts` on the target machine, written locally rather than downloaded, so the files never carry a Mark-of-the-Web flag that would otherwise get them blocked.
+
+📖 **Full documentation:** [scripts/CloudDriveMapper/documentation.md](./scripts/CloudDriveMapper/documentation.md)
+
+Available from the main menu (see [Menu Options](#menu-options) below), or run standalone — see the docs for the full manual fallback procedure if the automated deployment doesn't run.
 
 ---
 
@@ -122,6 +144,7 @@ An interactive menu will appear — pick what you need, then press `0` to exit w
 | `7` | **Nils & Kobby Net-User script** | Look up AD user details and group memberships by username or display name |
 | `8` | **Get PC Info** | Displays local PC hardware and OS details (name, model, serial, MAC, OS) |
 | `9` | **Get User License** | Looks up a user's M365 license and recommends MEC or LTSC Office install |
+| `10` | **Deploy CDM L-Drive Mapper (L Drive)** | Creates `C:\Scripts`, writes `Map_L_Drive.ps1` + task XML for manual task import — see [docs](./scripts/CloudDriveMapper/documentation.md) |
 
 > After each task completes you are returned to the menu automatically.
 
@@ -192,12 +215,28 @@ arjo-tools/
 ├── main.ps1                                   # Interactive menu entrypoint
 ├── pipelines/
 │   └── install26/                             # arjo-ignition pipeline (NL2026 deployment)
-│       ├── install26.ps1                      # Pipeline entrypoint — runs all stages in order
+│       ├── setup.ps1                          # Pipeline entrypoint — runs all stages in order
+│       ├── documentation.md                   # Ignition pipeline docs
 │       └── components/
 │           ├── power.ps1                      # Power settings stage
 │           ├── teams.ps1                      # Microsoft Teams install stage
 │           ├── metrics.ps1                    # PC info collection + reporting stage
-│           └── drivers.ps1                    # Lenovo driver/firmware update stage (auto-resume)
+│           ├── drivers.ps1                    # Lenovo driver/firmware update stage (auto-resume)
+│           ├── cleanup.ps1                    # Auto-run on pipeline failure (removes drivers.ps1 copy)
+│           ├── removal.ps1                    # Manual full-uninstall of C:\ProgramData\ArjoTools
+│           ├── logitech_g_hub.ps1             # Standalone Logitech G HUB installer (not in default pipeline)
+│           └── vxl.ps1                        # VXL2 installer, per-user only (not in default pipeline)
+├── scripts/
+│   ├── auto-swc/                              # SWC / LogMeIn / AD automation (Playwright, Node.js)
+│   │   ├── auto-swc.js                        # Entry point
+│   │   ├── package.json
+│   │   ├── documentation.md                   # auto-swc docs
+│   │   ├── functions/                         # Page-interaction modules
+│   │   └── maps/                              # PC-type / software name maps
+│   └── CloudDriveMapper/                      # CDM V2 → V3 L-drive mapping solution
+│       ├── Map_L_Drive.ps1                    # Waits for R: then substs it to L:
+│       ├── CDM-L-DriveMapper.xml               # Scheduled task definition
+│       └── documentation.md                   # CDM L-Drive Mapper docs
 └── components/
    ├── printers.ps1                            # Printer installation (exposes Add-Printers)
    ├── power.ps1                               # Power configuration (exposes Set-PowerSettings)
@@ -206,11 +245,13 @@ arjo-tools/
    ├── view-logs.ps1                           # Lenovo update log viewer (exposes Show-LenovoLogs)
    ├── list-local-admin-for-site.ps1           # Local admin listing (exposes Show-GroupMenu)
    ├── nk-net-user-lookup.ps1                  # AD user lookup (exposes Start-UserLookup)
-   └── mslic.ps1                               # M365 license lookup + Office recommendation (exposes Get-UserLicense) 
+   ├── mslic.ps1                               # M365 license lookup + Office recommendation (exposes Get-UserLicense)
+   └── CloudDriveMapperL.ps1                   # Deploys CDM L-Drive Mapper files to C:\Scripts (exposes Install-CloudDriveMapperL)
 ```
  
 Scripts under `components/` expose named functions and are loaded by `main.ps1` on demand.
 Scripts in subdirectories run inline and can also be invoked directly without the menu.
+`scripts/` holds tools with their own dedicated `documentation.md`, some of which (CDM L-Drive Mapper) are also wired into the main menu via a thin wrapper in `components/`.
  
 </details>
 <details>
