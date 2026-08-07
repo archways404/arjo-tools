@@ -10,7 +10,8 @@ software = [
   PL23: "ProlificUSB-Serial-COM-Port_4.3.0.0_Driver_(x64)",
   TempLog: "ErlenGmbHTemplogger2_2.60_DE_01_(x86)",
   AFO: "AFO Service Applications (Group)",
-  AdobeDC: "AdobeAcrobatDC_21_SSP_EN_01_(x64)",
+  AdobeDCadvanced: "AdobeAcrobatDC_21_SSP_EN_01_(x64)",
   Symbliss: "ArjoSymblissBathServiceTool_10.2.6.1_01_(x64)",
   MaxiMove: "ArjoMaxiMove5_0.10.20_01",
+  ClickShare: "BarcoClickShareInstaller_4.43.0.8_MUI_01",
 ]

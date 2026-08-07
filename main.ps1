@@ -94,10 +94,10 @@ $menuItems = @(
             EntryPoint  = "Get-UserLicense"
     },
     @{
-        Label       = "Deploy CDM L-Drive Mapper (AutoCAD)"
-        Description = "Sets up L: subst mapping & scheduled task for the script"
-        Url         = "$repo/components/CloudDriveMapperCAD.ps1"
-        EntryPoint  = "Install-CloudDriveMapperCAD"
+        Label       = "Deploy CDM L-Drive Mapper (L Drive)"
+        Description = "Creates C:\Scripts, writes Map_L_Drive.ps1 + task XML, registers task"
+        Url         = "$repo/components/CloudDriveMapperL.ps1"
+        EntryPoint  = "Install-CloudDriveMapperL"
     }
 )
 
